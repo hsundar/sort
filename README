@@ -1,0 +1,45 @@
+COMPILE AND EXECUTE
+
+Change the environment variable WORK_DIR in run.pbs to the current directory.
+
+Also, set the OMP_NUM_THREADS variable and the program arguments to specify the 
+total number of points.
+
+Add the option -D USE_OLD_SORT to CXXFLAGS in Makefile if you want to use the 
+older version of the par::sampleSort(...).
+
+Now compile and execute using:
+
+./run.sh
+
+
+
+
+CHANGES
+
+A new namespace has been created 'omp_par' for OpenMP function.
+The following functions have been defined in include/omp_par/ompUtils.h
+
+merge : parallel merge.
+
+merge_sort : parallel merge sort ( default < ).
+
+reduce : parallel reduction.
+
+scan : parallel scan.
+
+
+The following functions have been added in the 'seq' namespace, in the file 
+include/seq/seqUtils.h
+
+BinSearch : Binary search.
+
+Merge : Sequential merge.
+
+
+
+
+PSEUDOCODE ( omp_par::merge_sort )
+
+<TO BE ADDED>
+
