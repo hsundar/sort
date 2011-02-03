@@ -58,6 +58,8 @@ int main(int argc, char **argv){
 #endif
 
 
+  //Sort
+  MPI_Barrier(MPI_COMM_WORLD);
   double wtime;
   wtime = omp_get_wtime ( );
   par::sampleSort<int>(in, out, MPI_COMM_WORLD);
@@ -117,8 +119,8 @@ bool verify(long size){
 
   double wtime;
   wtime = omp_get_wtime ( );
-  //omp_par::merge_sort(&A[0],&A[indx]);
-  std::sort(&A[0],&A[N_total]);
+  omp_par::merge_sort(&A[0],&A[indx]);
+  //std::sort(&A[0],&A[N_total]);
   cout<<"SeqTime:"<<omp_get_wtime()-wtime<<'\n';
 
   indx=0;

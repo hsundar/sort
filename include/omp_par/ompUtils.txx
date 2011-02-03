@@ -12,10 +12,11 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
   _DiffType N1=A_last-A_;
   _DiffType N2=B_last-B_;
 
+  //Split both arrays ( A and B ) into n equal parts.
+  //Find the position of each split in the final merged array.
   int n=10;
-  std::vector<_ValType> split; split.resize(p*n*2);
-  std::vector<_DiffType> split_size; split_size.resize(p*n*2);
-
+  _ValType* split=new _ValType[p*n*2];
+  _DiffType* split_size=new _DiffType[p*n*2];
   #pragma omp parallel for
   for(int i=0;i<p;i++){
     for(int j=0;j<n;j++){
@@ -31,35 +32,42 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
     }
   }
 
-  std::vector<_ValType> split1; split1.resize(p+1);
-  std::vector<_DiffType> split_size1; split_size1.resize(p+1);
-  std::vector<_DiffType> split_indx_A; split_indx_A.resize(p+1);
-  std::vector<_DiffType> split_indx_B; split_indx_B.resize(p+1);
+  //Find the closest split position for each thread that will 
+  //divide the final array equally between the threads.
+  _DiffType* split_indx_A=new _DiffType[p+1];
+  _DiffType* split_indx_B=new _DiffType[p+1];
   split_indx_A[0]=0;
   split_indx_B[0]=0;
   split_indx_A[p]=N1;
   split_indx_B[p]=N2;
-
   #pragma omp parallel for
   for(int i=1;i<p;i++){
-    _ValType  split1     =split     [0];
-    _DiffType split_size1=split_size[0];
     _DiffType req_size=i*(N1+N2)/p;
-    for(int j=0;j<p*n*2;j++){
-      if(abs(split_size[j]-req_size)<abs(split_size1-req_size)){
-        split1     =split   [j];
-        split_size1=split_size[j];
-      }
+
+    int j=seq::BinSearch(&split_size[0],&split_size[p*n],req_size,std::less<_DiffType>());
+    _ValType  split1     =split     [j];
+    _DiffType split_size1=split_size[j];
+
+    j=seq::BinSearch(&split_size[p*n],&split_size[p*n*2],req_size,std::less<_DiffType>())+p*n;
+    if(abs(split_size[j]-req_size)<abs(split_size1-req_size)){
+      split1     =split   [j];
+      split_size1=split_size[j];
     }
+
     split_indx_A[i]=seq::BinSearch(A_,A_last,split1,comp);
     split_indx_B[i]=seq::BinSearch(B_,B_last,split1,comp);
   }
+  delete split;
+  delete split_size;
 
+  //Merge for each thread independently.
   #pragma omp parallel for
   for(int i=0;i<p;i++){
     T C=C_+split_indx_A[i]+split_indx_B[i];
     seq::Merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C,comp);
   }
+  delete split_indx_A;
+  delete split_indx_B;
 }
 
 template <class T,class StrictWeakOrdering>
@@ -70,22 +78,25 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
   int p=omp_get_max_threads();
 
   _DiffType N=A_last-A; 
-  std::vector<_DiffType> split;
-  split.resize(p+1);
-  split[p]=N;
 
+  //Split the array A into p equal parts.
+  _DiffType* split=new _DiffType[p+1];
+  split[p]=N;
   #pragma omp parallel for
   for(int id=0;id<p;id++){
     split[id]=(N/p)*id;
   }
+
+  //Sort each part independently.
   #pragma omp parallel for
   for(int id=0;id<p;id++){
     std::sort(A+split[id],A+split[id+1]);
   }
   
-  std::vector<_ValType> B; B.reserve(N);
-  _ValType* A_=&A[0];//T A_=A;
-  _ValType* B_=&B[0];//T B_=B.begin();
+  //Merge two parts at a time.
+  _ValType* B=new _ValType[N];
+  _ValType* A_=&A[0];
+  _ValType* B_=&B[0];
   for(int j=1;j<p;j=j*2){
     for(int i=0;i<p;i=i+2*j){
       if(i+j<p){
@@ -100,11 +111,17 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
     A_=B_;
     B_=tmp_swap;
   }
-  if(A_!=&A[0]){//if(A_!=A){
+
+  //The final result should be in A.
+  if(A_!=&A[0]){
     #pragma omp parallel for
     for(int i=0;i<N;i++)
       A[i]=A_[i];
   }
+
+  //Free memory.
+  delete split;
+  delete B;
 }
 
 template <class T>
