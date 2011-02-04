@@ -1108,8 +1108,9 @@ namespace par {
       DendroIntL extra = (totalWt%npesLong);
 
       //The Heart of the algorithm....
-/*      if(avgLoad > 0) {
-        for (DendroIntL i = 0; i < nlSize; i++) {
+      if(avgLoad > 0) {
+
+/*        for (DendroIntL i = 0; i < nlSize; i++) {
           if(lscn[i] == 0) {		
             sendSz[0]++;
           }else {
@@ -1122,12 +1123,9 @@ namespace par {
             assert(ind < npes);
             sendSz[ind]++;
           }//end if-else
-        }//end for 
-      }else {
-        sendSz[0]+= nlSize;
-      }//end if-else*/
+        }//end for */
 
-      { //This is more effecient and parallelizable than the above.
+        //This is more effecient and parallelizable than the above.
 	int ind_min,ind_max;
 	if ( lscn[0] <= (extra*(avgLoad + 1)) ){
 	  ind_min = ((lscn[0] - 1)/(avgLoad + 1));
@@ -1143,10 +1141,15 @@ namespace par {
 	for(int i=ind_min; i<=ind_max; i++){
 	  DendroIntL wt1=(i  )*(avgLoad+1)-(i  <extra?0:(i  )-extra);
 	  DendroIntL wt2=(i+1)*(avgLoad+1)-(i+1<extra?0:(i+1)-extra);
-	  sendSz[i]=seq::BinSearch(&lscn[0], &lscn[nlSize], wt2, std::less<DendroIntL>())
-	      - seq::BinSearch(&lscn[0], &lscn[nlSize], wt1, std::less<DendroIntL>());
+	  //sendSz[i]=seq::BinSearch(&lscn[0], &lscn[nlSize], wt2, std::less<DendroIntL>())
+	  //    - seq::BinSearch(&lscn[0], &lscn[nlSize], wt1, std::less<DendroIntL>());
+	  sendSz[i]=std::upper_bound(&lscn[0], &lscn[nlSize], wt2, std::less<DendroIntL>())
+	      - std::upper_bound(&lscn[0], &lscn[nlSize], wt1, std::less<DendroIntL>());
 	}
-      }
+
+      }else {
+        sendSz[0]+= nlSize;
+      }//end if-else*/
 
 
 #ifdef __DEBUG_PAR__
@@ -1545,9 +1548,11 @@ namespace par {
 	lst_split_indx[omp_p]=nelem;
 	#pragma omp parallel for
 	for(int i=1;i<omp_p;i++){
-	  proc_split[i] = seq::BinSearch(&splittersPtr[0],&splittersPtr[npes-1],arr[i*nelem/omp_p],std::less<T>());
+	  //proc_split[i] = seq::BinSearch(&splittersPtr[0],&splittersPtr[npes-1],arr[i*nelem/omp_p],std::less<T>());
+	  proc_split[i] = std::upper_bound(&splittersPtr[0],&splittersPtr[npes-1],arr[i*nelem/omp_p],std::less<T>())-&splittersPtr[0];
 	  if(proc_split[i]<npes-1){
-            lst_split_indx[i]=seq::BinSearch(&arr[0],&arr[nelem],splittersPtr[proc_split[i]],std::less<T>());
+            //lst_split_indx[i]=seq::BinSearch(&arr[0],&arr[nelem],splittersPtr[proc_split[i]],std::less<T>());
+            lst_split_indx[i]=std::upper_bound(&arr[0],&arr[nelem],splittersPtr[proc_split[i]],std::less<T>())-&arr[0];
 	  }else{
 	    proc_split[i]=npes-1;
 	    lst_split_indx[i]=nelem;

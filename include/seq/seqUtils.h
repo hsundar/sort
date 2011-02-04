@@ -89,14 +89,14 @@ namespace seq {
     bool maxLowerBound(const std::vector<T> & arr,const T & key, unsigned int & retIdx,
         unsigned int* leftIdx, unsigned int* rightIdx);
 
-
+/*
   template <class T,class StrictWeakOrdering>
     typename std::iterator_traits<T>::difference_type BinSearch(T A,T A_last,
 	const typename std::iterator_traits<T>::value_type& val,StrictWeakOrdering comp);
 
   template <class T,class StrictWeakOrdering>
     void Merge(T A_,T A_last,T B_,T B_last,T C_,StrictWeakOrdering comp);
-
+*/
 
 }//end namespace
 

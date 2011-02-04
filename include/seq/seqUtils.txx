@@ -211,11 +211,10 @@ namespace seq {
     }
 }//end namespace
 
-
+/*    //Same as std::upper_limit
     template <class T,class StrictWeakOrdering>
     typename std::iterator_traits<T>::difference_type seq::BinSearch(T A,T A_last,
 	const typename std::iterator_traits<T>::value_type& val,StrictWeakOrdering comp){
-
       typedef typename std::iterator_traits<T>::difference_type _DiffType;
 
       _DiffType a=0;
@@ -234,6 +233,7 @@ namespace seq {
       return b;
     }
 
+     //Same as std::merge
     template <class T,class StrictWeakOrdering>
     void seq::Merge(T A_,T A_last,T B_,T B_last,T C_,StrictWeakOrdering comp){
 
@@ -275,6 +275,6 @@ namespace seq {
         }
       }
     }
-
+*/
 
  

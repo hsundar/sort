@@ -1,9 +1,9 @@
 #!/bin/bash
 
 make clean
-make
+make -j10
 mkdir -p tmp
-rm tmp/*
+rm -r -f tmp/*
 
 #Submit Job
 qsub run.pbs
