@@ -1589,8 +1589,8 @@ namespace par {
 	  if(sendcnts_>0)
 	    sendcnts[k]=sendcnts_;
 	}
-	delete lst_split_indx;
-	delete proc_split;
+	delete [] lst_split_indx;
+	delete [] proc_split;
       }
 
       par::Mpi_Alltoall<int>(sendcnts, recvcnts, 1, comm);

@@ -67,8 +67,8 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
     //split_indx_B[i]=seq::BinSearch(B_,B_last,split1,comp);
     split_indx_B[i]=std::upper_bound(B_,B_last,split1,comp)-B_;
   }
-  delete split;
-  delete split_size;
+  delete[] split;
+  delete[] split_size;
 
   //Merge for each thread independently.
   #pragma omp parallel for
@@ -77,8 +77,8 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
 //    seq::Merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C,comp);
     std::merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C,comp);
   }
-  delete split_indx_A;
-  delete split_indx_B;
+  delete[] split_indx_A;
+  delete[] split_indx_B;
 }
 
 template <class T,class StrictWeakOrdering>
@@ -131,8 +131,8 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
   }
 
   //Free memory.
-  delete split;
-  delete B;
+  delete[] split;
+  delete[] B;
 }
 
 template <class T>
@@ -185,7 +185,7 @@ void omp_par::scan(T* A, T* B,I cnt){
     for(I j=start; j<end; j++)
       B[j]+=sum_;
   }
-
+  delete[] sum;
 }
 
 
