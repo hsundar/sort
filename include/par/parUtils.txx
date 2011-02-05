@@ -1109,8 +1109,8 @@ namespace par {
 
       //The Heart of the algorithm....
       if(avgLoad > 0) {
-
-/*        for (DendroIntL i = 0; i < nlSize; i++) {
+/*
+        for (DendroIntL i = 0; i < nlSize; i++) {
           if(lscn[i] == 0) {		
             sendSz[0]++;
           }else {
@@ -1139,12 +1139,17 @@ namespace par {
 	}
 	#pragma omp parallel for
 	for(int i=ind_min; i<=ind_max; i++){
-	  DendroIntL wt1=(i  )*(avgLoad+1)-(i  <extra?0:(i  )-extra);
-	  DendroIntL wt2=(i+1)*(avgLoad+1)-(i+1<extra?0:(i+1)-extra);
+	  DendroIntL wt1=(i  )*(avgLoad+1)-(i  <extra?0:(i  )-extra)+1;
+	  DendroIntL wt2=(i+1)*(avgLoad+1)-(i+1<extra?0:(i+1)-extra)+1;
 	  //sendSz[i]=seq::BinSearch(&lscn[0], &lscn[nlSize], wt2, std::less<DendroIntL>())
 	  //    - seq::BinSearch(&lscn[0], &lscn[nlSize], wt1, std::less<DendroIntL>());
-	  sendSz[i]=std::upper_bound(&lscn[0], &lscn[nlSize], wt2, std::less<DendroIntL>())
-	      - std::upper_bound(&lscn[0], &lscn[nlSize], wt1, std::less<DendroIntL>());
+	  int end = std::lower_bound(&lscn[0], &lscn[nlSize], wt2, std::less<DendroIntL>())-&lscn[0];
+	  int start = std::lower_bound(&lscn[0], &lscn[nlSize], wt1, std::less<DendroIntL>())-&lscn[0];
+	  if(i==0)
+	    start=0;
+	  if(i==npes-1)
+	    end=nlSize;
+	  sendSz[i]=end-start;
 	}
 
       }else {

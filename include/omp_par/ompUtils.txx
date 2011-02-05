@@ -48,11 +48,15 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
 
     //int j=seq::BinSearch(&split_size[0],&split_size[p*n],req_size,std::less<_DiffType>());
     int j=std::upper_bound(&split_size[0],&split_size[p*n],req_size,std::less<_DiffType>())-&split_size[0];
+    if(j>=p*n)
+      j=p*n-1;
     _ValType  split1     =split     [j];
     _DiffType split_size1=split_size[j];
 
     //j=seq::BinSearch(&split_size[p*n],&split_size[p*n*2],req_size,std::less<_DiffType>())+p*n;
     j=(std::upper_bound(&split_size[p*n],&split_size[p*n*2],req_size,std::less<_DiffType>())-&split_size[p*n])+p*n;
+    if(j>=2*p*n)
+      j=2*p*n-1;
     if(abs(split_size[j]-req_size)<abs(split_size1-req_size)){
       split1     =split   [j];
       split_size1=split_size[j];
@@ -97,9 +101,9 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
   //Sort each part independently.
   #pragma omp parallel for
   for(int id=0;id<p;id++){
-    std::sort(A+split[id],A+split[id+1]);
+    std::sort(A+split[id],A+split[id+1],comp);
   }
-  
+
   //Merge two parts at a time.
   _ValType* B=new _ValType[N];
   _ValType* A_=&A[0];
