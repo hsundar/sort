@@ -8,7 +8,7 @@ OBJDIR=./obj
 LIBDIR=./lib
 BINDIR=./bin
 
-CXXFLAGS= -g -openmp $(INCDIR) #-D USE_OLD_SORT
+CXXFLAGS= -O3 -openmp $(INCDIR) #-D USE_OLD_SORT
 LFLAGS= -r
 LIBS=
 
