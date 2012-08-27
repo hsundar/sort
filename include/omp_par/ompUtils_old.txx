@@ -80,11 +80,8 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
   typedef typename std::iterator_traits<T>::value_type _ValType;
 
   int p=omp_get_max_threads();
+
   _DiffType N=A_last-A; 
-  if(N<2*p || p==1){
-    std::sort(A,A_last,comp);
-    return;
-  }
 
   //Split the array A into p equal parts.
   _DiffType* split=new _DiffType[p+1];

@@ -1,3 +1,4 @@
+#include <iomanip>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -6,13 +7,15 @@
 #include <ompUtils.h>
 #include <parUtils.h>
 
-#define __VERIFY__
+//#define __VERIFY__
 
 using namespace std;
 
 bool verify(long size);
 
 int main(int argc, char **argv){
+
+  std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
 
   // Initialize MPI
   MPI_Init(&argc, &argv);
@@ -31,7 +34,7 @@ int main(int argc, char **argv){
   //################ MPI WARMUP ###################
   std::vector<int> in_init(1); in_init.resize(1);
   std::vector<int> out_init;
-  par::sampleSort(in_init,out_init, MPI_COMM_WORLD);
+  //par::sampleSort(in_init,out_init, MPI_COMM_WORLD);
   //###############################################
 
 
@@ -57,6 +60,11 @@ int main(int argc, char **argv){
   fclose(f);
 #endif
 
+  std::vector<int> in_cpy=in;
+  par::sampleSort<int>(in, out, MPI_COMM_WORLD);
+  in=in_cpy;
+  par::sampleSort1<int>(in, out, MPI_COMM_WORLD);
+  in=in_cpy;
 
   //Sort
   MPI_Barrier(MPI_COMM_WORLD);
@@ -64,8 +72,18 @@ int main(int argc, char **argv){
   wtime = omp_get_wtime ( );
   par::sampleSort<int>(in, out, MPI_COMM_WORLD);
   wtime = omp_get_wtime ( ) - wtime;
-  std::cout<<"P"<<myrank<<"    =>    Time:"<<wtime<<"    OMP_Threads:"<<omp_get_max_threads()<<'\n';
+  MPI_Barrier(MPI_COMM_WORLD);
+  if(!myrank) std::cout<<"P"<<myrank<<"    =>    Time:"<<wtime<<"    OMP_Threads:"<<omp_get_max_threads()<<'\n';
+  in=in_cpy;
 
+  MPI_Barrier(MPI_COMM_WORLD);
+  if(!myrank) std::cout<<"\nOld Sort:\n";
+  MPI_Barrier(MPI_COMM_WORLD);
+  wtime = omp_get_wtime ( );
+  par::sampleSort1<int>(in, out, MPI_COMM_WORLD);
+  wtime = omp_get_wtime ( ) - wtime;
+  MPI_Barrier(MPI_COMM_WORLD);
+  if(!myrank) std::cout<<"P"<<myrank<<"    =>    Time:"<<wtime<<"    OMP_Threads:"<<omp_get_max_threads()<<'\n';
 
 #ifdef __VERIFY__
   //Save output to file
