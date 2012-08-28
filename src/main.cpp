@@ -186,29 +186,32 @@ int main(int argc, char **argv){
 
   int j=0;
   MPI_Comm comm;
-  for(int i=p;myrank<i && i>0 ;i>>1) j++;
+  for(int i=p;myrank<i && i>0 ;i=i>>1) j++;
   MPI_Comm_split(MPI_COMM_WORLD, j, myrank, &comm);
 
   std::vector<double> tt(3000000,0);
   long N_total = atol(argv[2]); //4000000;
-  long N=1000000; //N_total/p;
-  for(int k=0;k<1;k++){
-    std::vector<double> ttt=time_sort(N,MPI_COMM_WORLD);
-    if(!myrank){
-      tt[0*1000000+100*k+0]=ttt[0];
-      tt[1*1000000+100*k+0]=ttt[1];
-      tt[2*1000000+100*k+0]=ttt[2];
+  long N=1000; //N_total/p;
+  for(int k=0;k<4;k++){
+    {
+      std::vector<double> ttt=time_sort(N,MPI_COMM_WORLD);
+      if(!myrank){
+        tt[0*1000000+100*k+0]=ttt[0];
+        tt[1*1000000+100*k+0]=ttt[1];
+        tt[2*1000000+100*k+0]=ttt[2];
+      }
     }
-  }
-  for(int k=0;k<1;k++){
-    int myrank_;
-    MPI_Comm_rank(comm, &myrank_);
-    std::vector<double> ttt=time_sort(N,comm);
-    if(!myrank_){
-      tt[0*1000000+100*k+j]=ttt[0];
-      tt[1*1000000+100*k+j]=ttt[1];
-      tt[2*1000000+100*k+j]=ttt[2];
+    {
+      int myrank_;
+      MPI_Comm_rank(comm, &myrank_);
+      std::vector<double> ttt=time_sort(N,comm);
+      if(!myrank_){
+        tt[0*1000000+100*k+j]=ttt[0];
+        tt[1*1000000+100*k+j]=ttt[1];
+        tt[2*1000000+100*k+j]=ttt[2];
+      }
     }
+    N=N*10;
   }
 
   std::vector<double> tt_glb(3000000);
@@ -217,7 +220,7 @@ int main(int argc, char **argv){
     for(int i=1;i<=j;i++){
       int np=1u<<(j-i);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<3;k++)
+      for(int k=0;k<4;k++)
         std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
@@ -225,7 +228,7 @@ int main(int argc, char **argv){
     for(int i=1;i<=j;i++){
       int np=1u<<(j-i);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<3;k++)
+      for(int k=0;k<4;k++)
         std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
@@ -233,7 +236,7 @@ int main(int argc, char **argv){
     for(int i=1;i<=j;i++){
       int np=1u<<(j-i);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<3;k++)
+      for(int k=0;k<4;k++)
         std::cout<<tt_glb[2*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
