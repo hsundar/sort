@@ -1,5 +1,5 @@
 AR=ar
-CXX=CC
+CXX=mpicxx
 RM=rm -r -f
 MKDIRS=mkdir -p
 INCDIR=-I./include -I./include/par -I./include/binOps -I./include/seq -I./include/omp_par
@@ -8,7 +8,7 @@ OBJDIR=./obj
 LIBDIR=./lib
 BINDIR=./bin
 
-CXXFLAGS= -O2 -openmp $(INCDIR) -D__USE_64_BIT_INT__ -DALLTOALLV_FIX #-D USE_OLD_SORT
+CXXFLAGS= -O2 -fopenmp $(INCDIR) #-D USE_OLD_SORT
 LFLAGS= -r
 LIBS=
 

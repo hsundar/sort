@@ -11,99 +11,6 @@
 
 using namespace std;
 
-bool verify(long size);
-
-int main(int argc, char **argv){
-
-  std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
-
-  // Initialize MPI
-  MPI_Init(&argc, &argv);
-
-  //Set number of OpenMP threads to use.
-  omp_set_num_threads(atoi(argv[1]));
-
-  // Find out my identity in the default communicator 
-  int myrank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-
-  // Find out number of processes
-  int p;
-  MPI_Comm_size(MPI_COMM_WORLD,&p);
-
-  //################ MPI WARMUP ###################
-  std::vector<int> in_init(1); in_init.resize(1);
-  std::vector<int> out_init;
-  //par::sampleSort(in_init,out_init, MPI_COMM_WORLD);
-  //###############################################
-
-
-  // Geerate random data
-  long N_total = atol(argv[2]); //4000000;
-  long N = N_total/p;
-  srand(/*omp_get_wtime()+*/myrank+1);
-  //N=rand()%N;
-  int* A=new int[N];
-  for(int i=0;i<N;i++)
-    A[i]=rand();
-  std::vector<int> in(&A[0],&A[N]);
-  std::vector<int> out;
-
-
-#ifdef __VERIFY__
-  //Save input to file
-  stringstream fname_;
-  fname_<<"tmp/input_"<<myrank<<'\0';
-  string fname=fname_.str();
-  FILE* f=fopen(&fname[0],"wb+");
-  fwrite(A,N,sizeof(int),f);
-  fclose(f);
-#endif
-
-  std::vector<int> in_cpy=in;
-  par::sampleSort<int>(in, out, MPI_COMM_WORLD);
-  in=in_cpy;
-  par::sampleSort1<int>(in, out, MPI_COMM_WORLD);
-  in=in_cpy;
-
-  //Sort
-  MPI_Barrier(MPI_COMM_WORLD);
-  double wtime;
-  wtime = omp_get_wtime ( );
-  par::sampleSort<int>(in, out, MPI_COMM_WORLD);
-  wtime = omp_get_wtime ( ) - wtime;
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(!myrank) std::cout<<"P"<<myrank<<"    =>    Time:"<<wtime<<"    OMP_Threads:"<<omp_get_max_threads()<<'\n';
-  in=in_cpy;
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(!myrank) std::cout<<"\nOld Sort:\n";
-  MPI_Barrier(MPI_COMM_WORLD);
-  wtime = omp_get_wtime ( );
-  par::sampleSort1<int>(in, out, MPI_COMM_WORLD);
-  wtime = omp_get_wtime ( ) - wtime;
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(!myrank) std::cout<<"P"<<myrank<<"    =>    Time:"<<wtime<<"    OMP_Threads:"<<omp_get_max_threads()<<'\n';
-
-#ifdef __VERIFY__
-  //Save output to file
-  stringstream fname1_;
-  fname1_<<"tmp/output_"<<myrank<<'\0';
-  fname=fname1_.str();
-  f=fopen(&fname[0],"wb+");
-  fwrite(&out[0],out.size(),sizeof(int),f);
-  fclose(f);
-
-  verify(N_total);
-#endif
-
-  // Shut down MPI 
-  MPI_Finalize();
-  return 0;
-
-}
-
-
 bool verify(long size){
 
   // Find out my identity in the default communicator 
@@ -170,4 +77,173 @@ bool verify(long size){
   return true;
 
 }
+
+
+std::vector<double> time_sort(size_t N, MPI_Comm comm){
+  // Find out my identity in the default communicator 
+  int myrank;
+  MPI_Comm_rank(comm, &myrank);
+
+  // Find out number of processes
+  int p;
+  MPI_Comm_size(comm,&p);
+
+  //################ MPI WARMUP ###################
+  std::vector<int> in_init(1); in_init.resize(1);
+  std::vector<int> out_init;
+  //par::sampleSort(in_init,out_init, comm);
+  //###############################################
+
+  // Geerate random data
+  srand(/*omp_get_wtime()+*/myrank+1);
+  int* A=new int[N];
+  for(int i=0;i<N;i++)
+    A[i]=rand();
+  std::vector<int> in(&A[0],&A[N]);
+  std::vector<int> in_cpy=in;
+  std::vector<int> out;
+
+#ifdef __VERIFY__
+  //Save input to file
+  stringstream fname_;
+  fname_<<"tmp/input_"<<myrank<<'\0';
+  string fname=fname_.str();
+  FILE* f=fopen(&fname[0],"wb+");
+  fwrite(A,N,sizeof(int),f);
+  fclose(f);
+#endif
+
+  std::vector<double> tt(3);
+  par::sampleSort<int>(in, out, comm);
+  in=in_cpy;
+  par::bitonicSort<int>(in, comm); out=in;
+  in=in_cpy;
+  par::sampleSort1<int>(in, out, comm);
+  in=in_cpy;
+
+  //Sort
+  double wtime;
+  MPI_Barrier(comm);
+  wtime=-omp_get_wtime();
+  par::sampleSort<int>(in, out, comm);
+  MPI_Barrier(comm);
+  wtime+=omp_get_wtime();
+  //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
+  tt[0]=wtime;
+  in=in_cpy;
+
+  MPI_Barrier(comm);
+  wtime=-omp_get_wtime();
+  par::bitonicSort<int>(in, comm); out=in;
+  MPI_Barrier(comm);
+  wtime+=omp_get_wtime();
+  //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
+  tt[1]=wtime;
+  in=in_cpy;
+
+  MPI_Barrier(comm);
+  wtime=-omp_get_wtime();
+  par::sampleSort1<int>(in, out, comm);
+  MPI_Barrier(comm);
+  wtime+=omp_get_wtime();
+  //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
+  tt[2]=wtime;
+  in=in_cpy;
+
+#ifdef __VERIFY__
+  //Save output to file
+  stringstream fname1_;
+  fname1_<<"tmp/output_"<<myrank<<'\0';
+  fname=fname1_.str();
+  f=fopen(&fname[0],"wb+");
+  fwrite(&out[0],out.size(),sizeof(int),f);
+  fclose(f);
+
+  verify(N_total);
+#endif
+
+  return tt;
+
+}
+
+int main(int argc, char **argv){
+
+  std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
+
+  // Initialize MPI
+  MPI_Init(&argc, &argv);
+
+  //Set number of OpenMP threads to use.
+  omp_set_num_threads(atoi(argv[1]));
+
+  // Find out my identity in the default communicator 
+  int myrank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+  // Find out number of processes
+  int p;
+  MPI_Comm_size(MPI_COMM_WORLD, &p);
+
+  int j=0;
+  MPI_Comm comm;
+  for(int i=p;myrank<i && i>0 ;i>>1) j++;
+  MPI_Comm_split(MPI_COMM_WORLD, j, myrank, &comm);
+
+  std::vector<double> tt(3000000,0);
+  long N_total = atol(argv[2]); //4000000;
+  long N=1000000; //N_total/p;
+  for(int k=0;k<1;k++){
+    std::vector<double> ttt=time_sort(N,MPI_COMM_WORLD);
+    if(!myrank){
+      tt[0*1000000+100*k+0]=ttt[0];
+      tt[1*1000000+100*k+0]=ttt[1];
+      tt[2*1000000+100*k+0]=ttt[2];
+    }
+  }
+  for(int k=0;k<1;k++){
+    int myrank_;
+    MPI_Comm_rank(comm, &myrank_);
+    std::vector<double> ttt=time_sort(N,comm);
+    if(!myrank_){
+      tt[0*1000000+100*k+j]=ttt[0];
+      tt[1*1000000+100*k+j]=ttt[1];
+      tt[2*1000000+100*k+j]=ttt[2];
+    }
+  }
+
+  std::vector<double> tt_glb(3000000);
+  MPI_Reduce(&tt[0], &tt_glb[0], 3000000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  if(!myrank){
+    for(int i=1;i<=j;i++){
+      int np=1u<<(j-i);
+      std::cout<<"P="<<np<<' ';
+      for(int k=0;k<3;k++)
+        std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
+      std::cout<<'\n';
+    }
+    std::cout<<"\n\n";
+    for(int i=1;i<=j;i++){
+      int np=1u<<(j-i);
+      std::cout<<"P="<<np<<' ';
+      for(int k=0;k<3;k++)
+        std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
+      std::cout<<'\n';
+    }
+    std::cout<<"\n\n";
+    for(int i=1;i<=j;i++){
+      int np=1u<<(j-i);
+      std::cout<<"P="<<np<<' ';
+      for(int k=0;k<3;k++)
+        std::cout<<tt_glb[2*1000000+100*k+i]<<' ';
+      std::cout<<'\n';
+    }
+    std::cout<<"\n\n";
+  }
+
+  // Shut down MPI 
+  MPI_Finalize();
+  return 0;
+
+}
+
 
