@@ -20,7 +20,7 @@
 # nodes: number of 8-core nodes
 #   ppn: how many cores per node to use (1 through 8)
 #       (you are always charged for the entire node)
-#PBS -l nodes=4
+#PBS -l nodes=6
 #
 # export all my environment variables to the job
 #PBS -V
@@ -48,5 +48,5 @@ cp ${PBS_NODEFILE} ${MY_NODEFILE}
 NP=`wc -l $MY_NODEFILE | cut -d' ' -f1`
 
 #mpirun --hostfile $MY_NODEFILE -np ${NP} ./bin/main ${OMP_NUM_THREADS} 100000000
-mpirun --hostfile $MY_NODEFILE -np   48  ./bin/main ${OMP_NUM_THREADS} 1000000
+mpirun --hostfile $MY_NODEFILE -np   64  ./bin/main ${OMP_NUM_THREADS} 1000000
 

@@ -217,6 +217,7 @@ int main(int argc, char **argv){
   std::vector<double> tt_glb(3000000);
   MPI_Reduce(&tt[0], &tt_glb[0], 3000000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!myrank){
+    std::cout<<"\n\nNew Sort:\n";
     for(int i=1;i<=j;i++){
       int np=1u<<(j-i);
       std::cout<<"P="<<np<<' ';
@@ -224,7 +225,7 @@ int main(int argc, char **argv){
         std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
-    std::cout<<"\n\n";
+    std::cout<<"\n\nBitonic Sort:\n";
     for(int i=1;i<=j;i++){
       int np=1u<<(j-i);
       std::cout<<"P="<<np<<' ';
@@ -232,7 +233,7 @@ int main(int argc, char **argv){
         std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
-    std::cout<<"\n\n";
+    std::cout<<"\n\nOld Sort:\n";
     for(int i=1;i<=j;i++){
       int np=1u<<(j-i);
       std::cout<<"P="<<np<<' ';
