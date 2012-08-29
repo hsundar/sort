@@ -2,7 +2,7 @@ AR=ar
 CXX=mpicxx
 RM=rm -r -f
 MKDIRS=mkdir -p
-INCDIR=-I./include -I./include/par -I./include/binOps -I./include/seq -I./include/omp_par
+INCDIR=-I./include -I./include/oct -I./include/point -I./include/par -I./include/binOps -I./include/seq -I./include/omp_par
 SRCDIR=./src
 OBJDIR=./obj
 LIBDIR=./lib
@@ -14,7 +14,7 @@ LIBS=
 
 
 CCFILES=main.cpp
-CFILES=par/parUtils.C binOps/binUtils.C
+CFILES=par/parUtils.C binOps/binUtils.C oct/TreeNode.C
 
 OBJS=$(CCFILES:%.cpp=$(OBJDIR)/%.o) \
      $(CFILES:%.C=$(OBJDIR)/%.o)
