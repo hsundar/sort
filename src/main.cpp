@@ -6,7 +6,8 @@
 #include <sstream>
 #include <ompUtils.h>
 #include <parUtils.h>
-
+#include <octUtils.h>
+#include <TreeNode.h>
 //#define __VERIFY__
 
 using namespace std;
@@ -96,12 +97,15 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
 
   // Geerate random data
   srand(/*omp_get_wtime()+*/myrank+1);
-  int* A=new int[N];
-  for(int i=0;i<N;i++)
-    A[i]=rand();
-  std::vector<int> in(&A[0],&A[N]);
-  std::vector<int> in_cpy=in;
-  std::vector<int> out;
+  std::vector<ot::TreeNode> in(N);
+  #define MAX_DEPTH 30
+  unsigned int s=(1u << MAX_DEPTH);
+  for(int i=0;i<N;i++){
+    ot::TreeNode node(rand()%s, rand()%s, rand()%s, MAX_DEPTH-1, 3, MAX_DEPTH);
+    in[i]=node;
+  }
+  std::vector<ot::TreeNode> in_cpy=in;
+  std::vector<ot::TreeNode> out;
 
 #ifdef __VERIFY__
   //Save input to file
@@ -109,23 +113,23 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
   fname_<<"tmp/input_"<<myrank<<'\0';
   string fname=fname_.str();
   FILE* f=fopen(&fname[0],"wb+");
-  fwrite(A,N,sizeof(int),f);
+  fwrite(&in[0],N,sizeof(int),f);
   fclose(f);
 #endif
 
   std::vector<double> tt(3);
-  par::sampleSort<int>(in, out, comm);
+  par::sampleSort<ot::TreeNode>(in, out, comm);
   in=in_cpy;
-  par::bitonicSort<int>(in, comm); out=in;
+  par::bitonicSort<ot::TreeNode>(in, comm); out=in;
   in=in_cpy;
-  par::sampleSort1<int>(in, out, comm);
+  par::sampleSort1<ot::TreeNode>(in, out, comm);
   in=in_cpy;
 
   //Sort
   double wtime;
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::sampleSort<int>(in, out, comm);
+  par::sampleSort<ot::TreeNode>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
   //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
@@ -134,7 +138,7 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
 
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::bitonicSort<int>(in, comm); out=in;
+  par::bitonicSort<ot::TreeNode>(in, comm); out=in;
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
   //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
@@ -143,7 +147,7 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
 
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::sampleSort1<int>(in, out, comm);
+  par::sampleSort1<ot::TreeNode>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
   //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
@@ -191,8 +195,8 @@ int main(int argc, char **argv){
 
   std::vector<double> tt(3000000,0);
   long N_total = atol(argv[2]); //4000000;
-  long N=1000; //N_total/p;
-  for(int k=0;k<4;k++){
+  long N=100; //N_total/p;
+  for(int k=0;k<7;k++){
     {
       std::vector<double> ttt=time_sort(N,MPI_COMM_WORLD);
       if(!myrank){
@@ -211,33 +215,33 @@ int main(int argc, char **argv){
         tt[2*1000000+100*k+j]=ttt[2];
       }
     }
-    N=N*10;
+    N=N*4;
   }
 
   std::vector<double> tt_glb(3000000);
   MPI_Reduce(&tt[0], &tt_glb[0], 3000000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!myrank){
     std::cout<<"\n\nNew Sort:\n";
-    for(int i=1;i<=j;i++){
-      int np=1u<<(j-i);
+    for(int i=0;i<j;i++){
+      int np=1u<<(j-i-1);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<4;k++)
+      for(int k=0;k<7;k++)
         std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
     std::cout<<"\n\nBitonic Sort:\n";
-    for(int i=1;i<=j;i++){
-      int np=1u<<(j-i);
+    for(int i=0;i<j;i++){
+      int np=1u<<(j-i-1);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<4;k++)
+      for(int k=0;k<7;k++)
         std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
     std::cout<<"\n\nOld Sort:\n";
-    for(int i=1;i<=j;i++){
-      int np=1u<<(j-i);
+    for(int i=0;i<j;i++){
+      int np=1u<<(j-i-1);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<4;k++)
+      for(int k=0;k<7;k++)
         std::cout<<tt_glb[2*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
