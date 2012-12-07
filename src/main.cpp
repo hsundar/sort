@@ -64,8 +64,6 @@ bool verify(std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
 
 
 std::vector<double> time_sort(size_t N, MPI_Comm comm){
-  typedef ot::TreeNode Data_t;
-  //typedef int Data_t;
 
   // Find out my identity in the default communicator 
   int myrank;
@@ -77,14 +75,17 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
 
   // Geerate random data
   srand(/*omp_get_wtime()+*/myrank+1);
+  /*
+  typedef ot::TreeNode Data_t;
   std::vector<Data_t> in(N);
-  //*
   #define MAX_DEPTH 30
   unsigned int s=(1u << MAX_DEPTH);
   for(int i=0;i<N;i++){
     ot::TreeNode node(rand()%s, rand()%s, rand()%s, MAX_DEPTH-1, 3, MAX_DEPTH);
     in[i]=node; 
   }/*/
+  typedef int Data_t;
+  std::vector<Data_t> in(N);
   for(int i=0;i<N;i++){
     in[i]=rand(); 
   } // */
