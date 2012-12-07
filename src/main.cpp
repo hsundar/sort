@@ -223,7 +223,9 @@ int main(int argc, char **argv){
   if(!myrank){
     std::cout<<"\n\nNew Sort:\n";
     for(int i=0;i<j;i++){
-      int np=1u<<(j-i-1);
+      //int np=1u<<(j-i-1);
+      int np=p;
+      if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"P="<<np<<' ';
       for(int k=0;k<7;k++)
         std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
@@ -231,7 +233,8 @@ int main(int argc, char **argv){
     }
     std::cout<<"\n\nBitonic Sort:\n";
     for(int i=0;i<j;i++){
-      int np=1u<<(j-i-1);
+      int np=p;
+      if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"P="<<np<<' ';
       for(int k=0;k<7;k++)
         std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
@@ -239,7 +242,8 @@ int main(int argc, char **argv){
     }
     std::cout<<"\n\nOld Sort:\n";
     for(int i=0;i<j;i++){
-      int np=1u<<(j-i-1);
+      int np=p;
+      if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"P="<<np<<' ';
       for(int k=0;k<7;k++)
         std::cout<<tt_glb[2*1000000+100*k+i]<<' ';

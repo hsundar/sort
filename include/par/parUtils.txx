@@ -457,7 +457,7 @@ namespace par {
         #pragma omp parallel for
         for(int i=0;i<new_np;i++){
           s_cnt_new[i]+=r_cnt[i]+r_cnt_ext[i];
-	}
+        }
         omp_par::scan(&s_cnt_new[0],&sdisp_new[0],new_np);
 
         //Copy data to sbuff_new.
@@ -470,7 +470,7 @@ namespace par {
           //if(i<new_np-1) assert(sdisp_new[i]+s_cnt_old[i]+r_cnt[i]+r_cnt_ext[i]==sdisp_new[i+1]);
         }
 
-	//Free memory.
+        //Free memory.
         if(sbuff   !=NULL) delete[] sbuff   ;
         if(rbuff   !=NULL) delete[] rbuff   ;
         if(rbuffext!=NULL) delete[] rbuffext;
@@ -1300,7 +1300,7 @@ namespace par {
         }//end for */ 
 /*
         //This is more effecient and parallelizable than the above.
-	//This has a bug trying a simpler approach below.
+        //This has a bug trying a simpler approach below.
         int ind_min,ind_max;
         ind_min=(lscn[0]*npesLong)/totalWt-1;
         ind_max=(lscn[nlSize-1]*npesLong)/totalWt+2;
@@ -1570,9 +1570,9 @@ namespace par {
       MPI_Comm comm=comm_;
 
       // Get comm size and rank.
-      int npes, myrank;
+      int npes, myrank, myrank_;
       MPI_Comm_size(comm, &npes);
-      MPI_Comm_rank(comm, &myrank);
+      MPI_Comm_rank(comm, &myrank); myrank_=myrank;
       int omp_p=omp_get_max_threads();
 
       // Local and global sizes. O(log p)
@@ -1580,8 +1580,6 @@ namespace par {
       par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
       DendroIntL nelem_ = nelem;
 
-      int npes_=npes;
-      int myrank_=myrank;
       tt[0]+=omp_get_wtime(); //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOC
 
       // Local sort.
@@ -1591,32 +1589,37 @@ namespace par {
       tt[1]+=omp_get_wtime(); //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOC
 
       // Binary split and merge in each iteration.
-      while(npes>1){ // O(log p) iterations.
+      while(npes>1 && totSize>0){ // O(log p) iterations.
 
         //Determine splitters. O( log(N/p) + log(p) )
         MPI_Barrier(comm); tt[2]-=omp_get_wtime(); //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TIC
         T split_key;
         DendroIntL totSize_new;
-        while(true){ 
+        //while(true)
+        { 
           // Take random splitters. O( 1 ) -- Let p * splt_count = glb_splt_count = const = 100~1000
-          assert(nelem);
-          int splt_count=1000/npes;
-          if(splt_count==0) splt_count=1;
+          int splt_count=(1000*nelem)/totSize; 
+          if(npes>1000) splt_count=(((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?1:0);
+          if(splt_count>nelem) splt_count=nelem;
           std::vector<T> splitters(splt_count);
           for(size_t i=0;i<splt_count;i++) 
             splitters[i]=arr_[rand()%nelem];
 
           // Gather all splitters. O( log(p) )
           int glb_splt_count;
-          MPI_Allreduce(&splt_count, &glb_splt_count, 1, MPI_INT, MPI_SUM, comm);
+          std::vector<int> glb_splt_cnts(npes);
+          std::vector<int> glb_splt_disp(npes,0);
+          par::Mpi_Allgather<int>(&splt_count, &glb_splt_cnts[0], 1, comm);
+          omp_par::scan(&glb_splt_cnts[0],&glb_splt_disp[0],npes);
+          glb_splt_count=glb_splt_cnts[npes-1]+glb_splt_disp[npes-1];
           std::vector<T> glb_splitters(glb_splt_count);
-          par::Mpi_Allgather<T>(&    splitters[0], &glb_splitters[0], splt_count, comm);
-          //MPI_Allgather(&    splitters[0],     splt_count, par::Mpi_datatype<T>::value(), 
-          //              &glb_splitters[0], glb_splt_count, par::Mpi_datatype<T>::value(), comm);
+          MPI_Allgatherv(&    splitters[0], splt_count, par::Mpi_datatype<T>::value(), 
+                         &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
+                         par::Mpi_datatype<T>::value(), comm);
 
-          // Determine binary split key. O( log(N/p) + log(p) )
-          std::vector<DendroIntL> disp(glb_splt_count);
-          for(size_t i=0;i<glb_splt_count;i++)
+          // Determine split key. O( log(N/p) + log(p) )
+          std::vector<DendroIntL> disp(glb_splt_count,0);
+          if(nelem>0) for(size_t i=0;i<glb_splt_count;i++)
             disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
           std::vector<DendroIntL> glb_disp(glb_splt_count,0);
           MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
@@ -1626,9 +1629,9 @@ namespace par {
             if(abs(glb_disp[i]-totSize/2)<abs(*split_disp-totSize/2)) split_disp=&glb_disp[i];
           split_key=glb_splitters[split_disp-&glb_disp[0]];
 
-          double err=(((double)*split_disp)/(totSize/2))-1.0;
           totSize_new=(myrank<=(npes-1)/2?*split_disp:totSize-*split_disp);
-          if(fabs(err)<0.01 || npes<=16) break;
+          //double err=(((double)*split_disp)/(totSize/2))-1.0;
+          //if(fabs(err)<0.01 || npes<=16) break;
           //else if(!myrank) std::cout<<err<<'\n';
         }
         tt[2]+=omp_get_wtime(); //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOC
@@ -1652,7 +1655,7 @@ namespace par {
           char *sbuff, *lbuff;
           int     rsize=0,     ssize=0, lsize=0;
           int ext_rsize=0, ext_ssize=0;
-          size_t split_indx=std::lower_bound(&arr_[0], &arr_[nelem], split_key)-&arr_[0];
+          size_t split_indx=(nelem>0?std::lower_bound(&arr_[0], &arr_[nelem], split_key)-&arr_[0]:0);
           ssize=       (myrank> split_id? split_indx: nelem-split_indx )*sizeof(T);
           sbuff=(char*)(myrank> split_id? &arr_[0]   :  &arr_[split_indx]);
           lsize=       (myrank<=split_id? split_indx: nelem-split_indx )*sizeof(T);
@@ -1705,6 +1708,8 @@ namespace par {
       MPI_Barrier(comm); tt[6]-=omp_get_wtime(); //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< TIC
       SortedElem.assign(arr_, &arr_[nelem]);
       SortedElem.resize(nelem);
+
+      par::partitionW<T>(SortedElem, NULL , comm_);
       tt[6]+=omp_get_wtime(); //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOC
       ttt+=omp_get_wtime(); //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> TOC
 
@@ -1730,9 +1735,9 @@ namespace par {
       MPI_Comm comm=comm_;
 
       // Get comm size and rank.
-      int npes, myrank;
+      int npes, myrank, myrank_;
       MPI_Comm_size(comm, &npes);
-      MPI_Comm_rank(comm, &myrank);
+      MPI_Comm_rank(comm, &myrank); myrank_=myrank;
       int omp_p=omp_get_max_threads();
 
       // Local and global sizes. O(log p)
@@ -1745,31 +1750,36 @@ namespace par {
       omp_par::merge_sort(&arr_[0], &arr_[arr.size()]);
 
       // Binary split and merge in each iteration.
-      while(npes>1){ // O(log p) iterations.
+      while(npes>1 && totSize>0){ // O(log p) iterations.
 
         //Determine splitters. O( log(N/p) + log(p) )
         T split_key;
         DendroIntL totSize_new;
-        while(true){ 
+        //while(true)
+        { 
           // Take random splitters. O( 1 ) -- Let p * splt_count = glb_splt_count = const = 100~1000
-          assert(nelem);
-          int splt_count=1000/npes;
-          if(splt_count==0) splt_count=1;
+          int splt_count=(1000*nelem)/totSize; 
+          if(npes>1000) splt_count=(((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?1:0);
+          if(splt_count>nelem) splt_count=nelem;
           std::vector<T> splitters(splt_count);
           for(size_t i=0;i<splt_count;i++) 
             splitters[i]=arr_[rand()%nelem];
 
           // Gather all splitters. O( log(p) )
           int glb_splt_count;
-          MPI_Allreduce(&splt_count, &glb_splt_count, 1, MPI_INT, MPI_SUM, comm);
+          std::vector<int> glb_splt_cnts(npes);
+          std::vector<int> glb_splt_disp(npes,0);
+          par::Mpi_Allgather<int>(&splt_count, &glb_splt_cnts[0], 1, comm);
+          omp_par::scan(&glb_splt_cnts[0],&glb_splt_disp[0],npes);
+          glb_splt_count=glb_splt_cnts[npes-1]+glb_splt_disp[npes-1];
           std::vector<T> glb_splitters(glb_splt_count);
-          par::Mpi_Allgather<T>(&    splitters[0], &glb_splitters[0], splt_count, comm);
-          //MPI_Allgather(&    splitters[0],     splt_count, par::Mpi_datatype<T>::value(), 
-          //              &glb_splitters[0], glb_splt_count, par::Mpi_datatype<T>::value(), comm);
+          MPI_Allgatherv(&    splitters[0], splt_count, par::Mpi_datatype<T>::value(), 
+                         &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
+                         par::Mpi_datatype<T>::value(), comm);
 
-          // Determine binary split key. O( log(N/p) + log(p) )
-          std::vector<DendroIntL> disp(glb_splt_count);
-          for(size_t i=0;i<glb_splt_count;i++)
+          // Determine split key. O( log(N/p) + log(p) )
+          std::vector<DendroIntL> disp(glb_splt_count,0);
+          if(nelem>0) for(size_t i=0;i<glb_splt_count;i++)
             disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
           std::vector<DendroIntL> glb_disp(glb_splt_count,0);
           MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
@@ -1779,9 +1789,9 @@ namespace par {
             if(abs(glb_disp[i]-totSize/2)<abs(*split_disp-totSize/2)) split_disp=&glb_disp[i];
           split_key=glb_splitters[split_disp-&glb_disp[0]];
 
-          double err=(((double)*split_disp)/(totSize/2))-1.0;
           totSize_new=(myrank<=(npes-1)/2?*split_disp:totSize-*split_disp);
-          if(fabs(err)<0.01 || npes<=16) break;
+          //double err=(((double)*split_disp)/(totSize/2))-1.0;
+          //if(fabs(err)<0.01 || npes<=16) break;
           //else if(!myrank) std::cout<<err<<'\n';
         }
 
@@ -1803,7 +1813,7 @@ namespace par {
           char *sbuff, *lbuff;
           int     rsize=0,     ssize=0, lsize=0;
           int ext_rsize=0, ext_ssize=0;
-          size_t split_indx=std::lower_bound(&arr_[0], &arr_[nelem], split_key)-&arr_[0];
+          size_t split_indx=(nelem>0?std::lower_bound(&arr_[0], &arr_[nelem], split_key)-&arr_[0]:0);
           ssize=       (myrank> split_id? split_indx: nelem-split_indx )*sizeof(T);
           sbuff=(char*)(myrank> split_id? &arr_[0]   :  &arr_[split_indx]);
           lsize=       (myrank<=split_id? split_indx: nelem-split_indx )*sizeof(T);
@@ -1851,9 +1861,12 @@ namespace par {
       SortedElem.assign(arr_, &arr_[nelem]);
       SortedElem.resize(nelem);
 
+      par::partitionW<T>(SortedElem, NULL , comm_);
+
       PROF_SORT_END
     }//end function
 // */
+
   template<typename T>
     int sampleSort1(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm){ 
 #ifdef __PROFILE_WITH_BARRIER__

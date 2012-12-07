@@ -7,6 +7,7 @@ SRCDIR=./src
 OBJDIR=./obj
 LIBDIR=./lib
 BINDIR=./bin
+TMPDIR=./tmp
 
 CXXFLAGS= -O2 -openmp $(INCDIR) -D__USE_64_BIT_INT__ -DALLTOALLV_FIX #-D USE_OLD_SORT
 LFLAGS= -r
@@ -25,7 +26,7 @@ all : $(TARGET)
 
 
 clean :
-	$(RM) $(OBJDIR)/* $(BINDIR)/* $(LIBDIR)/*
+	$(RM) $(OBJDIR)/* $(BINDIR)/* $(LIBDIR)/* $(TMPDIR)/*
 
 $(TARGET) : $(OBJS)
 	-@$(MKDIRS) $(dir $@)
