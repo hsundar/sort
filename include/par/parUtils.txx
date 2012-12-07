@@ -1830,6 +1830,12 @@ namespace par {
       int npes, myrank, myrank_;
       MPI_Comm_size(comm, &npes);
       MPI_Comm_rank(comm, &myrank); myrank_=myrank;
+      if(npes==1){
+        omp_par::merge_sort(&arr[0],&arr[arr.size()]);
+        SortedElem  = arr;
+        PROF_SORT_END
+      }
+
       int omp_p=omp_get_max_threads();
       srand(myrank);
 
@@ -1955,8 +1961,9 @@ namespace par {
         }
       }
 
-      SortedElem.assign(arr_, &arr_[nelem]);
       SortedElem.resize(nelem);
+      SortedElem.assign(arr_, &arr_[nelem]);
+      if(arr_!=NULL) delete[] arr_;
 
       par::partitionW<T>(SortedElem, NULL , comm_);
 
