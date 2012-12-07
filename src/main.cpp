@@ -118,18 +118,18 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
 #endif
 
   std::vector<double> tt(3);
-  par::sampleSort<ot::TreeNode>(in, out, comm);
+  par::HyperQuickSort<ot::TreeNode>(in, out, comm);
   in=in_cpy;
   par::bitonicSort<ot::TreeNode>(in, comm); out=in;
   in=in_cpy;
-  par::sampleSort1<ot::TreeNode>(in, out, comm);
+  par::sampleSort<ot::TreeNode>(in, out, comm);
   in=in_cpy;
 
   //Sort
   double wtime;
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::sampleSort<ot::TreeNode>(in, out, comm);
+  par::HyperQuickSort<ot::TreeNode>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
   //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
@@ -147,7 +147,7 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
 
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::sampleSort1<ot::TreeNode>(in, out, comm);
+  par::sampleSort<ot::TreeNode>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
   //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';

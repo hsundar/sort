@@ -391,6 +391,16 @@ namespace par {
         std::vector<T> & listB, MPI_Comm comm);
 
   /**
+    @brief A parallel hyper quick sort implementation.
+    @author Dhairya Malhotra
+    @param in the input vector
+    @param out the output vector
+    @param comm the communicator
+    */
+  template<typename T>
+    int HyperQuickSort(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
+
+  /**
     @brief A parallel sample sort implementation. In our implementation, we do not pose any 
     restriction on the input or the number of processors. This function can be used with an odd number of processors as well.
     Some processors can pass an empty vector as input. If the total number of elements in the vector (globally) is fewer 
@@ -407,9 +417,6 @@ namespace par {
     */
   template<typename T>
     int sampleSort(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
-
-  template<typename T>
-    int sampleSort1(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 
   /**
     @brief Removes duplicates in parallel. If the input is not sorted, sample sort will be called 

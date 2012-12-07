@@ -1458,7 +1458,7 @@ namespace par {
       std::vector<T> tmpVec;
       if(!isSorted) {                  
         //Sort partitions vecT and tmpVec internally.
-        par::sampleSort<T>(vecT, tmpVec, comm);                                    
+        par::HyperQuickSort<T>(vecT, tmpVec, comm);                                    
       }else {
         swap(tmpVec, vecT);
       }
@@ -1556,7 +1556,7 @@ namespace par {
     }//end function
 /*
   template<typename T>
-    int sampleSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
+    int HyperQuickSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
 #ifdef __PROFILE_WITH_BARRIER__
       MPI_Barrier(comm);
 #endif
@@ -1619,8 +1619,12 @@ namespace par {
 
           // Determine split key. O( log(N/p) + log(p) )
           std::vector<DendroIntL> disp(glb_splt_count,0);
-          if(nelem>0) for(size_t i=0;i<glb_splt_count;i++)
-            disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
+          if(nelem>0){
+            #pragma omp parallel for
+            for(size_t i=0;i<glb_splt_count;i++){
+              disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
+            }
+          }
           std::vector<DendroIntL> glb_disp(glb_splt_count,0);
           MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
 
@@ -1725,7 +1729,7 @@ namespace par {
     }//end function
 /*/
   template<typename T>
-    int sampleSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
+    int HyperQuickSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
 #ifdef __PROFILE_WITH_BARRIER__
       MPI_Barrier(comm);
 #endif
@@ -1779,8 +1783,12 @@ namespace par {
 
           // Determine split key. O( log(N/p) + log(p) )
           std::vector<DendroIntL> disp(glb_splt_count,0);
-          if(nelem>0) for(size_t i=0;i<glb_splt_count;i++)
-            disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
+          if(nelem>0){
+            #pragma omp parallel for
+            for(size_t i=0;i<glb_splt_count;i++){
+              disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
+            }
+          }
           std::vector<DendroIntL> glb_disp(glb_splt_count,0);
           MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
 
@@ -1868,7 +1876,7 @@ namespace par {
 // */
 
   template<typename T>
-    int sampleSort1(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm){ 
+    int sampleSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm){ 
 #ifdef __PROFILE_WITH_BARRIER__
       MPI_Barrier(comm);
 #endif
