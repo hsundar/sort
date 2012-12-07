@@ -1,4 +1,5 @@
 #include <iomanip>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <vector>
@@ -10,77 +11,62 @@
 #include <TreeNode.h>
 //#define __VERIFY__
 
-using namespace std;
-
-bool verify(long size){
+template <class T>
+bool verify(std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
 
   // Find out my identity in the default communicator 
-  int myrank;
-  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  if(myrank!=0) return true;
+  int myrank, p;
+  MPI_Comm_rank(comm, &myrank);
+  MPI_Comm_size(comm,&p);
 
-  // Find out number of processes
-  int p;
-  MPI_Comm_size(MPI_COMM_WORLD,&p);
+  std::vector<T> in;
+  {
+    int N_local=in_.size()*sizeof(T);
+    std::vector<int> r_size(p, 0);
+    std::vector<int> r_disp(p, 0);
+    MPI_Gather(&N_local  , 1, MPI_INT, 
+               &r_size[0], 1, MPI_INT, 0, comm);
+    omp_par::scan(&r_size[0], &r_disp[0], p);
 
-  int* A=new int[size];
-  int* B=new int[size];
-
-  long indx=0;
-  for(int i=0;i<p;i++){
-    stringstream fname_;
-    fname_<<"tmp/input_"<<i<<'\0';
-    string fname=fname_.str();
-    FILE* f=fopen(&fname[0],"rb");
-
-    fseek (f , 0 , SEEK_END);
-    int N = ftell (f)/sizeof(int);
-    rewind (f);
-
-    fread(&A[indx],N,sizeof(int),f);
-    indx+=N;
-    fclose(f);
+    if(!myrank) in.resize((r_size[p-1]+r_disp[p-1])/sizeof(T));
+    MPI_Gatherv((char*)&in_[0],    N_local,             MPI_BYTE, 
+                (char*)&in [0], &r_size[0], &r_disp[0], MPI_BYTE, 0, comm);
   }
-  long N_total=indx;
 
-  double wtime;
-  wtime = omp_get_wtime ( );
-  //omp_par::merge_sort(&A[0],&A[indx]);
-  std::sort(&A[0],&A[N_total]);
-  cout<<"SeqTime:"<<omp_get_wtime()-wtime<<'\n';
+  std::vector<T> out;
+  {
+    int N_local=out_.size()*sizeof(T);
+    std::vector<int> r_size(p, 0);
+    std::vector<int> r_disp(p, 0);
+    MPI_Gather(&N_local  , 1, MPI_INT, 
+               &r_size[0], 1, MPI_INT, 0, comm);
+    omp_par::scan(&r_size[0], &r_disp[0], p);
 
-  indx=0;
-  for(int i=0;i<p;i++){
-    stringstream fname_;
-    fname_<<"tmp/output_"<<i<<'\0';
-    string fname=fname_.str();
-    FILE* f=fopen(&fname[0],"rb");
+    if(!myrank) out.resize((r_size[p-1]+r_disp[p-1])/sizeof(T));
+    MPI_Gatherv((char*)&out_[0],    N_local,             MPI_BYTE, 
+                (char*)&out [0], &r_size[0], &r_disp[0], MPI_BYTE, 0, comm);
+  }
 
-    fseek (f , 0 , SEEK_END);
-    int N = ftell (f)/sizeof(int);
-    rewind (f);
+  if(in.size()!=out.size()){
+    std::cout<<"Wrong size: in="<<in.size()<<" out="<<out.size()<<'\n';
+    return false;
+  }
+  std::sort(&in[0], &in[in.size()]);
 
-    fread(&B[indx],N,sizeof(int),f);
-
-    for(long j=indx;j<indx+N;j++){
-      if(A[j]!=B[j]){
-	cout<<A[j]<<" "<<B[j]<<'\n';
-	cout<<"Failed at:"<<j<<'\n';
-	return false;
-      }
+  for(long j=0;j<in.size();j++)
+    if(in[j]!=out[j]){
+      std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
+      return false;
     }
-    indx+=N;
-    fclose(f);
-  }
-  if(indx!=N_total)
-    std::cout<<"Output size is wrong.\n";
 
   return true;
-
 }
 
 
 std::vector<double> time_sort(size_t N, MPI_Comm comm){
+  typedef ot::TreeNode Data_t;
+  //typedef int Data_t;
+
   // Find out my identity in the default communicator 
   int myrank;
   MPI_Comm_rank(comm, &myrank);
@@ -89,85 +75,70 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
   int p;
   MPI_Comm_size(comm,&p);
 
-  //################ MPI WARMUP ###################
-  std::vector<int> in_init(1); in_init.resize(1);
-  std::vector<int> out_init;
-  //par::sampleSort(in_init,out_init, comm);
-  //###############################################
-
   // Geerate random data
   srand(/*omp_get_wtime()+*/myrank+1);
-  std::vector<ot::TreeNode> in(N);
+  std::vector<Data_t> in(N);
+  //*
   #define MAX_DEPTH 30
   unsigned int s=(1u << MAX_DEPTH);
   for(int i=0;i<N;i++){
     ot::TreeNode node(rand()%s, rand()%s, rand()%s, MAX_DEPTH-1, 3, MAX_DEPTH);
-    in[i]=node;
-  }
-  std::vector<ot::TreeNode> in_cpy=in;
-  std::vector<ot::TreeNode> out;
+    in[i]=node; 
+  }/*/
+  for(int i=0;i<N;i++){
+    in[i]=rand(); 
+  } // */
+  std::vector<Data_t> in_cpy=in;
+  std::vector<Data_t> out;
 
+  // Warmup run and verification.
+  par::HyperQuickSort<Data_t>(in, out, comm);
+  in=in_cpy;
 #ifdef __VERIFY__
-  //Save input to file
-  stringstream fname_;
-  fname_<<"tmp/input_"<<myrank<<'\0';
-  string fname=fname_.str();
-  FILE* f=fopen(&fname[0],"wb+");
-  fwrite(&in[0],N,sizeof(int),f);
-  fclose(f);
+  verify(in,out,comm);
+#endif
+
+  par::bitonicSort<Data_t>(in, comm); out=in;
+  in=in_cpy;
+#ifdef __VERIFY__
+  verify(in,out,comm);
+#endif
+
+  par::sampleSort<Data_t>(in, out, comm);
+  in=in_cpy;
+#ifdef __VERIFY__
+  verify(in,out,comm);
 #endif
 
   std::vector<double> tt(3);
-  par::HyperQuickSort<ot::TreeNode>(in, out, comm);
-  in=in_cpy;
-  par::bitonicSort<ot::TreeNode>(in, comm); out=in;
-  in=in_cpy;
-  par::sampleSort<ot::TreeNode>(in, out, comm);
-  in=in_cpy;
+  double wtime;
 
   //Sort
-  double wtime;
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::HyperQuickSort<ot::TreeNode>(in, out, comm);
+  par::HyperQuickSort<Data_t>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
-  //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
   tt[0]=wtime;
   in=in_cpy;
 
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::bitonicSort<ot::TreeNode>(in, comm); out=in;
+  par::bitonicSort<Data_t>(in, comm); out=in;
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
-  //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
   tt[1]=wtime;
   in=in_cpy;
 
   MPI_Barrier(comm);
   wtime=-omp_get_wtime();
-  par::sampleSort<ot::TreeNode>(in, out, comm);
+  par::sampleSort<Data_t>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
-  //if(!myrank) std::cout<<N<<' '<<wtime<<'\n';
   tt[2]=wtime;
   in=in_cpy;
 
-#ifdef __VERIFY__
-  //Save output to file
-  stringstream fname1_;
-  fname1_<<"tmp/output_"<<myrank<<'\0';
-  fname=fname1_.str();
-  f=fopen(&fname[0],"wb+");
-  fwrite(&out[0],out.size(),sizeof(int),f);
-  fclose(f);
-
-  verify(N_total);
-#endif
-
   return tt;
-
 }
 
 int main(int argc, char **argv){
@@ -188,15 +159,17 @@ int main(int argc, char **argv){
   int p;
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-  int j=0;
+  int proc_group=0;
+  int min_np=1;
   MPI_Comm comm;
-  for(int i=p;myrank<i && i>0 ;i=i>>1) j++;
-  MPI_Comm_split(MPI_COMM_WORLD, j, myrank, &comm);
+  for(int i=p;myrank<i && i>=min_np ;i=i>>1) proc_group++;
+  MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
 
   std::vector<double> tt(3000000,0);
+  int log_N = 6;
   long N_total = atol(argv[2]); //4000000;
   long N=100; //N_total/p;
-  for(int k=0;k<7;k++){
+  for(int k=0;k<=log_N;k++){
     {
       std::vector<double> ttt=time_sort(N,MPI_COMM_WORLD);
       if(!myrank){
@@ -208,11 +181,12 @@ int main(int argc, char **argv){
     {
       int myrank_;
       MPI_Comm_rank(comm, &myrank_);
-      std::vector<double> ttt=time_sort(N,comm);
+      std::vector<double> ttt;
+      ttt=time_sort(N,comm);
       if(!myrank_){
-        tt[0*1000000+100*k+j]=ttt[0];
-        tt[1*1000000+100*k+j]=ttt[1];
-        tt[2*1000000+100*k+j]=ttt[2];
+        tt[0*1000000+100*k+proc_group]=ttt[0];
+        tt[1*1000000+100*k+proc_group]=ttt[1];
+        tt[2*1000000+100*k+proc_group]=ttt[2];
       }
     }
     N=N*4;
@@ -222,30 +196,29 @@ int main(int argc, char **argv){
   MPI_Reduce(&tt[0], &tt_glb[0], 3000000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!myrank){
     std::cout<<"\n\nNew Sort:\n";
-    for(int i=0;i<j;i++){
-      //int np=1u<<(j-i-1);
+    for(int i=0;i<proc_group;i++){
       int np=p;
       if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<7;k++)
+      for(int k=0;k<=log_N;k++)
         std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
     std::cout<<"\n\nBitonic Sort:\n";
-    for(int i=0;i<j;i++){
+    for(int i=0;i<proc_group;i++){
       int np=p;
       if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<7;k++)
+      for(int k=0;k<=log_N;k++)
         std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
     std::cout<<"\n\nOld Sort:\n";
-    for(int i=0;i<j;i++){
+    for(int i=0;i<proc_group;i++){
       int np=p;
       if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"P="<<np<<' ';
-      for(int k=0;k<7;k++)
+      for(int k=0;k<=log_N;k++)
         std::cout<<tt_glb[2*1000000+100*k+i]<<' ';
       std::cout<<'\n';
     }
@@ -257,5 +230,4 @@ int main(int argc, char **argv){
   return 0;
 
 }
-
 

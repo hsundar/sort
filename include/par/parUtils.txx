@@ -376,10 +376,11 @@ namespace par {
         (sbuff_, s_cnt_, sdisp_,
          rbuff_, r_cnt_, rdisp_, c);
 #else
+  int kway=8;
   int np, pid;
   MPI_Comm_size(c,&np);
   MPI_Comm_rank(c,&pid);
-  int range[2]={0,np-1};
+  int range[2]={0,np};
   int split_id, partner;
 
   std::vector<int> s_cnt(np);
@@ -398,57 +399,144 @@ namespace par {
     memcpy(&sbuff[sdisp[i]]+2*sizeof(int),&sbuff_[sdisp_[i]],s_cnt[i]-2*sizeof(int));
   }
 
-  while(range[0]<range[1]){
-    split_id=(range[0]+range[1])/2;
+  int iter_cnt=0;
+  while(range[1]-range[0]>1){
+    iter_cnt++;
+    if(kway>range[1]-range[0]) 
+      kway=range[1]-range[0];
 
-    int new_range[2]={(pid<=split_id?range[0]:split_id+1),
-                      (pid<=split_id?split_id:range[1]  )};
-    int cmp_range[2]={(pid> split_id?range[0]:split_id+1),
-                      (pid> split_id?split_id:range[1]  )};
-    int new_np=new_range[1]-new_range[0]+1;
-    int cmp_np=cmp_range[1]-cmp_range[0]+1;;
-
-    partner=pid+cmp_range[0]-new_range[0];
-    if(partner>range[1]) partner=range[1];
-    assert(partner>=range[0]);
-    bool extra_partner=( (range[1]-range[0])%2==0  && 
-                          range[1]            ==pid  );
+    std::vector<int> new_range(kway+1);
+    for(int i=0;i<=kway;i++)
+      new_range[i]=(range[0]*(kway-i)+range[1]*i)/kway;
+    int p_class=(std::upper_bound(&new_range[0],&new_range[kway],pid)-&new_range[0]-1);
+    int new_np=new_range[p_class+1]-new_range[p_class];
+    int new_pid=pid-new_range[p_class];
 
     //Communication.
     {
-      int* s_lengths=&s_cnt[cmp_range[0]-range[0]];
-      std::vector<int> s_len_ext(cmp_np,0);
-      std::vector<int> r_cnt    (new_np,0);
-      std::vector<int> r_cnt_ext(new_np,0);
-      MPI_Status status;
-
+      std::vector<int> r_cnt    (new_np*kway, 0);
+      std::vector<int> r_cnt_ext(new_np*kway, 0);
       //Exchange send sizes.
-      MPI_Sendrecv                  (&s_lengths[0],cmp_np,MPI_INT, partner,0,   &r_cnt    [0],new_np,MPI_INT, partner,   0,c,&status);
-      if(extra_partner) MPI_Sendrecv(&s_len_ext[0],cmp_np,MPI_INT,split_id,0,   &r_cnt_ext[0],new_np,MPI_INT,split_id,   0,c,&status);
+      for(int i=0;i<kway;i++){
+        MPI_Status status;
+        int cmp_np=new_range[i+1]-new_range[i];
+        int partner=(new_pid<cmp_np?       new_range[i]+new_pid: new_range[i+1]-1) ;
+        assert(     (new_pid<cmp_np? true: new_range[i]+new_pid==new_range[i+1]  )); //Remove this.
+        MPI_Sendrecv(&s_cnt[new_range[i]-new_range[0]], cmp_np, MPI_INT, partner, 0,
+                     &r_cnt[new_np   *i ], new_np, MPI_INT, partner, 0, c, &status);
+
+        //Handle extra communication.
+        if(new_pid==new_np-1 && cmp_np>new_np){
+          int partner=new_range[i+1]-1;
+          std::vector<int> s_cnt_ext(cmp_np, 0);
+          MPI_Sendrecv(&s_cnt_ext[       0], cmp_np, MPI_INT, partner, 0,
+                       &r_cnt_ext[new_np*i], new_np, MPI_INT, partner, 0, c, &status);
+        }
+      }
 
       //Allocate receive buffer.
-      std::vector<int> rdisp    (new_np,0);
-      std::vector<int> rdisp_ext(new_np,0);
-      omp_par::scan(&r_cnt    [0],&rdisp    [0],new_np);
-      omp_par::scan(&r_cnt_ext[0],&rdisp_ext[0],new_np);
-      int rbuff_size    =rdisp    [new_np-1]+r_cnt    [new_np-1];
-      int rbuff_size_ext=rdisp_ext[new_np-1]+r_cnt_ext[new_np-1];
-      char* rbuff   =                new char[rbuff_size    ];
-      char* rbuffext=(extra_partner? new char[rbuff_size_ext]: NULL);
+      std::vector<int> rdisp    (new_np*kway, 0);
+      std::vector<int> rdisp_ext(new_np*kway, 0);
+      int rbuff_size, rbuff_size_ext;
+      char *rbuff, *rbuff_ext;
+      {
+        omp_par::scan(&r_cnt    [0], &rdisp    [0],new_np*kway);
+        omp_par::scan(&r_cnt_ext[0], &rdisp_ext[0],new_np*kway);
+        rbuff_size     = rdisp    [new_np*kway-1] + r_cnt    [new_np*kway-1];
+        rbuff_size_ext = rdisp_ext[new_np*kway-1] + r_cnt_ext[new_np*kway-1];
+        rbuff     = new char[rbuff_size    ];
+        rbuff_ext = new char[rbuff_size_ext];
+      }
 
       //Sendrecv data.
+      /*
+      for(int i=0;i<kway;i++){
+        MPI_Status status;
+        int cmp_np=new_range[i+1]-new_range[i];
+        int partner=(pid<cmp_np?       new_range[i]+pid: new_range[i+1]-1) ;
+        MPI_Sendrecv(&sbuff[sdisp[new_range[i]]], s_cnt[new_range[i+1]-1]+sdisp[new_range[i+1]-1]-sdisp[new_range[i]], MPI_BYTE, partner, 0,
+                     &rbuff[rdisp[new_np  *(i)]], r_cnt[new_np  *(i+1)-1]+rdisp[new_np  *(i+1)-1]-rdisp[new_np  *(i)], MPI_BYTE, partner, 0, c, &status);
+
+        //Handle extra communication.
+        if(pid==new_np-1 && cmp_np>new_np){
+          int partner=new_range[i+1]-1;
+          std::vector<int> s_cnt_ext(cmp_np, 0);
+          MPI_Sendrecv(                       NULL,                                                                       0, MPI_BYTE, partner, 0,
+                       &rbuff[rdisp_ext[new_np*i]], r_cnt_ext[new_np*(i+1)-1]+rdisp_ext[new_np*(i+1)-1]-rdisp_ext[new_np*i], MPI_BYTE, partner, 0, c, &status);
+        }
+      }*/
       {
-        int * s_cnt_tmp=&s_cnt[cmp_range[0]-range[0]] ;
-        int * sdisp_tmp=&sdisp[cmp_range[0]-range[0]];
-        char* sbuff_tmp=&sbuff[sdisp_tmp[0]];
-        int  sbuff_size=sdisp_tmp[cmp_np-1]+s_cnt_tmp[cmp_np-1]-sdisp_tmp[0];
-        MPI_Sendrecv                  (sbuff_tmp,sbuff_size,MPI_BYTE, partner,0,   &rbuff   [0],rbuff_size    ,MPI_BYTE, partner,   0,c,&status);
-        if(extra_partner) MPI_Sendrecv(     NULL,         0,MPI_BYTE,split_id,0,   &rbuffext[0],rbuff_size_ext,MPI_BYTE,split_id,   0,c,&status);
+        MPI_Request* requests = new MPI_Request[4*kway];
+        MPI_Status * statuses = new MPI_Status[4*kway];
+        int commCnt=0;
+        for(int i=0;i<kway;i++){
+          MPI_Status status;
+          int cmp_np=new_range[i+1]-new_range[i];
+          int partner=              new_range[i]+new_pid;
+          if(partner<new_range[i+1]){
+            MPI_Irecv(&rbuff    [rdisp    [new_np*i]], r_cnt    [new_np*(i+1)-1]+rdisp    [new_np*(i+1)-1]-rdisp    [new_np*i ], MPI_BYTE, partner, 0, c, &requests[commCnt]); commCnt++;
+	  }
+
+          //Handle extra recv.
+          if(new_pid==new_np-1 && cmp_np>new_np){
+            int partner=new_range[i+1]-1;
+            MPI_Irecv(&rbuff_ext[rdisp_ext[new_np*i]], r_cnt_ext[new_np*(i+1)-1]+rdisp_ext[new_np*(i+1)-1]-rdisp_ext[new_np*i ], MPI_BYTE, partner, 0, c, &requests[commCnt]); commCnt++;
+          }
+        }
+        for(int i=0;i<kway;i++){
+          MPI_Status status;
+          int cmp_np=new_range[i+1]-new_range[i];
+          int partner=(new_pid<cmp_np?  new_range[i]+new_pid: new_range[i+1]-1);
+	  int send_dsp     =sdisp[new_range[i  ]-new_range[0]  ];
+	  int send_dsp_last=sdisp[new_range[i+1]-new_range[0]-1];
+	  int send_cnt     =s_cnt[new_range[i+1]-new_range[0]-1]+send_dsp_last-send_dsp;
+          MPI_Issend (&sbuff[send_dsp], send_cnt, MPI_BYTE, partner, 0, c, &requests[commCnt]); commCnt++;
+        }
+        MPI_Waitall(commCnt, requests, statuses);
+        delete[] requests;
+        delete[] statuses;
       }
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
       //Rearrange received data.
       {
-        //assert(!extra_partner);
+        if(sbuff!=NULL) delete[] sbuff;
+        sbuff=new char[rbuff_size+rbuff_size_ext];
+
+        std::vector<int>  cnt_new(2*new_np*kway, 0);
+        std::vector<int> disp_new(2*new_np*kway, 0);
+        for(int i=0;i<new_np;i++)
+        for(int j=0;j<kway;j++){
+          cnt_new[(i*2  )*kway+j]=r_cnt    [j*new_np+i];
+          cnt_new[(i*2+1)*kway+j]=r_cnt_ext[j*new_np+i];
+        }
+        omp_par::scan(&cnt_new[0], &disp_new[0],2*new_np*kway);
+
+        #pragma omp parallel for
+        for(int i=0;i<new_np;i++)
+        for(int j=0;j<kway;j++){
+          memcpy(&sbuff[disp_new[(i*2  )*kway+j]], &rbuff    [rdisp    [j*new_np+i]], r_cnt    [j*new_np+i]);
+          memcpy(&sbuff[disp_new[(i*2+1)*kway+j]], &rbuff_ext[rdisp_ext[j*new_np+i]], r_cnt_ext[j*new_np+i]);
+        }
+
+        //Free memory.
+        if(rbuff    !=NULL) delete[] rbuff    ;
+        if(rbuff_ext!=NULL) delete[] rbuff_ext;
+
+        s_cnt.clear();
+        s_cnt.resize(new_np,0);
+        sdisp.resize(new_np);
+        for(int i=0;i<new_np;i++){
+          for(int j=0;j<2*kway;j++)
+            s_cnt[i]+=cnt_new[i*2*kway+j];
+          sdisp[i]=disp_new[i*2*kway];
+        }
+      }
+
+/*
+      //Rearrange received data.
+      {
         int * s_cnt_old=&s_cnt[new_range[0]-range[0]];
         int * sdisp_old=&sdisp[new_range[0]-range[0]];
         
@@ -456,7 +544,7 @@ namespace par {
         std::vector<int> sdisp_new(new_np       ,0                 );
         #pragma omp parallel for
         for(int i=0;i<new_np;i++){
-          s_cnt_new[i]+=r_cnt[i]+r_cnt_ext[i];
+          s_cnt_new[i]+=r_cnt[i];
         }
         omp_par::scan(&s_cnt_new[0],&sdisp_new[0],new_np);
 
@@ -466,24 +554,23 @@ namespace par {
         for(int i=0;i<new_np;i++){
           memcpy(&sbuff_new[sdisp_new[i]                      ],&sbuff   [sdisp_old[i]],s_cnt_old[i]);
           memcpy(&sbuff_new[sdisp_new[i]+s_cnt_old[i]         ],&rbuff   [rdisp    [i]],r_cnt    [i]);
-          memcpy(&sbuff_new[sdisp_new[i]+s_cnt_old[i]+r_cnt[i]],&rbuffext[rdisp_ext[i]],r_cnt_ext[i]);
-          //if(i<new_np-1) assert(sdisp_new[i]+s_cnt_old[i]+r_cnt[i]+r_cnt_ext[i]==sdisp_new[i+1]);
         }
 
         //Free memory.
         if(sbuff   !=NULL) delete[] sbuff   ;
         if(rbuff   !=NULL) delete[] rbuff   ;
-        if(rbuffext!=NULL) delete[] rbuffext;
 
         //Substitute data for next iteration.
         s_cnt=s_cnt_new;
         sdisp=sdisp_new;
         sbuff=sbuff_new;
-      }
+      }*/
     }
 
-    range[0]=new_range[0];
-    range[1]=new_range[1];
+    range[0]=new_range[p_class  ];
+    range[1]=new_range[p_class+1];
+    //range[0]=new_range[0];
+    //range[1]=new_range[1];
   }
 
   //Copy data to rbuff_.
