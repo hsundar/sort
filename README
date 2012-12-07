@@ -5,12 +5,9 @@ Change the environment variable WORK_DIR in run.pbs to the current directory.
 Also, set the OMP_NUM_THREADS variable and the program arguments to specify the 
 total number of points.
 
-Add the option -D USE_OLD_SORT to CXXFLAGS in Makefile if you want to use the 
-older version of the par::sampleSort(...).
-
-Now compile and execute using:
-
-./run.sh
+Copy Makefile_<machine name> to Makefile.
+Now compile and submit jobs using: ./run.sh
+(./scripts/jaguar.sh for Jaguar.)
 
 
 
