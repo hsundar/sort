@@ -1570,10 +1570,11 @@ namespace par {
       MPI_Comm comm=comm_;
 
       // Get comm size and rank.
-      int npes, myrank, myrank_;
-      MPI_Comm_size(comm, &npes);
+      int npes, npes_, myrank, myrank_;
+      MPI_Comm_size(comm, &npes); npes_=npes;
       MPI_Comm_rank(comm, &myrank); myrank_=myrank;
       int omp_p=omp_get_max_threads();
+      srand(myrank);
 
       // Local and global sizes. O(log p)
       DendroIntL totSize, nelem = arr.size(); assert(nelem);
@@ -1743,6 +1744,7 @@ namespace par {
       MPI_Comm_size(comm, &npes);
       MPI_Comm_rank(comm, &myrank); myrank_=myrank;
       int omp_p=omp_get_max_threads();
+      srand(myrank);
 
       // Local and global sizes. O(log p)
       DendroIntL totSize, nelem = arr.size(); assert(nelem);
