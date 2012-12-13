@@ -20,5 +20,5 @@ cp ${PBS_NODEFILE} ${MY_NODEFILE}
 
 cd ${WORK_DIR}
 export OMP_NUM_THREADS=${THREADS}
-time mpirun --hostfile $MY_NODEFILE -np ${MPI_PROC} ${EXEC} ${THREADS} ${NUM_PTS}
+time mpirun --hostfile $MY_NODEFILE -np ${MPI_PROC} ${EXEC} ${THREADS} l10MB
 

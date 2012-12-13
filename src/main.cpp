@@ -14,6 +14,8 @@
 #include <sortRecord.h>
 
 #define MAX_DEPTH 30
+#define SORT_FUNCTION par::HyperQuickSort
+//#define SORT_FUNCTION par::sampleSort
 //#define __VERIFY__
 
 long getNumElements(char* code) {
@@ -115,7 +117,7 @@ bool verify(std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
   return true;
 }
 
-std::vector<double> time_sort_bench(size_t N, MPI_Comm comm) {
+double time_sort_bench(size_t N, MPI_Comm comm) {
   int myrank, p;
 
   MPI_Comm_rank(comm, &myrank);
@@ -131,28 +133,23 @@ std::vector<double> time_sort_bench(size_t N, MPI_Comm comm) {
   std::vector<Data_t> out;
 
   // Warmup run and verification.
-  par::HyperQuickSort<Data_t>(in, out, comm);
+  SORT_FUNCTION<Data_t>(in, out, comm);
   in=in_cpy;
 #ifdef __VERIFY__
   verify(in,out,comm);
 #endif
   
-  std::vector<double> tt(3);
-  double wtime;
-
   //Sort
   MPI_Barrier(comm);
-  wtime=-omp_get_wtime();
-  par::HyperQuickSort<Data_t>(in, out, comm);
+  double wtime=-omp_get_wtime();
+  SORT_FUNCTION<Data_t>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
-  tt[0]=wtime;
-  in=in_cpy;
 
-  return tt;
+  return wtime;
 }
 
-std::vector<double> time_sort_tn(size_t N, MPI_Comm comm) {
+double time_sort_tn(size_t N, MPI_Comm comm) {
   int myrank, p;
 
   MPI_Comm_rank(comm, &myrank);
@@ -172,29 +169,24 @@ std::vector<double> time_sort_tn(size_t N, MPI_Comm comm) {
   std::vector<Data_t> out;
 
   // Warmup run and verification.
-  par::HyperQuickSort<Data_t>(in, out, comm);
+  SORT_FUNCTION<Data_t>(in, out, comm);
   in=in_cpy;
 #ifdef __VERIFY__
   verify(in,out,comm);
 #endif
   
-  std::vector<double> tt(3);
-  double wtime;
-
   //Sort
   MPI_Barrier(comm);
-  wtime=-omp_get_wtime();
-  par::HyperQuickSort<Data_t>(in, out, comm);
+  double wtime=-omp_get_wtime();
+  SORT_FUNCTION<Data_t>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
-  tt[0]=wtime;
-  in=in_cpy;
 
-  return tt;
+  return wtime;
 }
 
 template <class T>
-std::vector<double> time_sort(size_t N, MPI_Comm comm){
+double time_sort(size_t N, MPI_Comm comm){
 
   // Find out my identity in the default communicator 
   int myrank;
@@ -207,63 +199,26 @@ std::vector<double> time_sort(size_t N, MPI_Comm comm){
   // Geerate random data
   srand(/*omp_get_wtime()+*/myrank+1);
 
-  // typedef int Data_t;
   std::vector<T> in(N);
-  for(int i=0;i<N;i++){
-    in[i]=rand(); 
-  } // */
+  for(int i=0;i<N;i++) in[i]=rand(); 
   std::vector<T> in_cpy=in;
   std::vector<T> out;
 
   // Warmup run and verification.
-  par::HyperQuickSort<T>(in, out, comm);
+  SORT_FUNCTION<T>(in, out, comm);
   in=in_cpy;
 #ifdef __VERIFY__
   verify(in,out,comm);
 #endif
 
-  /*
-     par::bitonicSort<Data_t>(in, comm); out=in;
-     in=in_cpy;
-  #ifdef __VERIFY__
-    verify(in,out,comm);
-  #endif
-
-  par::sampleSort<Data_t>(in, out, comm);
-  in=in_cpy;
-  #ifdef __VERIFY__
-    verify(in,out,comm);
-  #endif
-  */
-  std::vector<double> tt(3);
-  double wtime;
-
   //Sort
   MPI_Barrier(comm);
-  wtime=-omp_get_wtime();
-  par::HyperQuickSort<T>(in, out, comm);
+  double wtime=-omp_get_wtime();
+  SORT_FUNCTION<T>(in, out, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
-  tt[0]=wtime;
-  in=in_cpy;
-  /*
-     MPI_Barrier(comm);
-     wtime=-omp_get_wtime();
-     par::bitonicSort<Data_t>(in, comm); out=in;
-     MPI_Barrier(comm);
-     wtime+=omp_get_wtime();
-     tt[1]=wtime;
-     in=in_cpy;
 
-     MPI_Barrier(comm);
-     wtime=-omp_get_wtime();
-     par::sampleSort<Data_t>(in, out, comm);
-     MPI_Barrier(comm);
-     wtime+=omp_get_wtime();
-     tt[2]=wtime;
-     in=in_cpy;
-     */
-  return tt;
+  return wtime;
 }
 
 int main(int argc, char **argv){
@@ -300,7 +255,7 @@ int main(int argc, char **argv){
   for(int i=p;myrank<i && i>=min_np ;i=i>>1) proc_group++;
   MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
 
-  std::vector<double> tt(3000000,0);
+  std::vector<double> tt(10000,0);
   
   int k = 0; // in case size based runs are needed 
   char dtype = argv[2][0];
@@ -315,7 +270,7 @@ int main(int argc, char **argv){
   // check if arguments are ok ...
     
   { // -- full size run  
-    std::vector<double> ttt;
+    double ttt;
     
     switch(dtype) {
       case 'i':
@@ -332,18 +287,14 @@ int main(int argc, char **argv){
         break;
     };
     if(!myrank){
-      tt[0*1000000+100*k+0]=ttt[0];
-      tt[1*1000000+100*k+0]=ttt[1];
-      tt[2*1000000+100*k+0]=ttt[2];
+      tt[100*k+0]=ttt;
     }
   }
   { // smaller /2^k runs 
     int myrank_;
     MPI_Comm_rank(comm, &myrank_);
-    std::vector<double> ttt;
+    double ttt;
 
-
-    // ttt=time_sort(N, comm);
     switch(dtype) {
       case 'i':
         ttt = time_sort<int>(N, comm);
@@ -360,14 +311,12 @@ int main(int argc, char **argv){
     };
 
     if(!myrank_){
-      tt[0*1000000+100*k+proc_group]=ttt[0];
-      tt[1*1000000+100*k+proc_group]=ttt[1];
-      tt[2*1000000+100*k+proc_group]=ttt[2];
+      tt[100*k+proc_group]=ttt;
     }
   }
 
-  std::vector<double> tt_glb(3000000);
-  MPI_Reduce(&tt[0], &tt_glb[0], 3000000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  std::vector<double> tt_glb(10000);
+  MPI_Reduce(&tt[0], &tt_glb[0], 10000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!myrank){
     std::cout<<"\nNew Sort:\n";
     for(int i=0;i<proc_group;i++){
@@ -375,30 +324,9 @@ int main(int argc, char **argv){
       if(i>0) np=(p>>(i-1))-(p>>i);
       std::cout<<"\tP="<<np<<' ';
       // for(int k=0;k<=log_N;k++)
-        std::cout<<tt_glb[0*1000000+100*k+i]<<' ';
+        std::cout<<tt_glb[100*k+i]<<' ';
       std::cout<<'\n';
     }
-    /*
-    std::cout<<"\n\nBitonic Sort:\n";
-    for(int i=0;i<proc_group;i++){
-      int np=p;
-      if(i>0) np=(p>>(i-1))-(p>>i);
-      std::cout<<"P="<<np<<' ';
-      // for(int k=0;k<=log_N;k++)
-        std::cout<<tt_glb[1*1000000+100*k+i]<<' ';
-      std::cout<<'\n';
-    }
-    std::cout<<"\n\nOld Sort:\n";
-    for(int i=0;i<proc_group;i++){
-      int np=p;
-      if(i>0) np=(p>>(i-1))-(p>>i);
-      std::cout<<"P="<<np<<' ';
-      // for(int k=0;k<=log_N;k++)
-        std::cout<<tt_glb[2*1000000+100*k+i]<<' ';
-      std::cout<<'\n';
-    }
-    std::cout<<"\n\n";
-    */
   }
 
   // Shut down MPI 

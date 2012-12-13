@@ -15,7 +15,6 @@ export NODES=6;            # Number of compute nodes.
 export CORES=12;           # Number of cores per node.
 export MPI_PROC=64;        # Number of MPI processes.
 export THREADS=1;          # Number of threads per MPI process.
-export NUM_PTS=1000000;    # Number of point sources/samples.
 
 FILE_OUT='tmp/main.out'
 FILE_ERR='tmp/main.err'

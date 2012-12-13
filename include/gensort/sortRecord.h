@@ -24,6 +24,15 @@ public:
       return this->eka < other.eka;
       */
   }
+  bool  operator <= ( sortRecord const  &other) const {
+    return (memcmp(this->key, other.key, 10) <= 0);
+  }
+  bool  operator > ( sortRecord const  &other) const {
+    return (memcmp(this->key, other.key, 10) > 0);
+  }
+  bool  operator >= ( sortRecord const  &other) const {
+    return (memcmp(this->key, other.key, 10) >= 0);
+  }
 }; 
 
 
