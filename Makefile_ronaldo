@@ -2,7 +2,7 @@ AR=ar
 CXX=mpicxx
 RM=rm -r -f
 MKDIRS=mkdir -p
-INCDIR=-I./include -I./include/oct -I./include/point -I./include/par -I./include/binOps -I./include/seq -I./include/omp_par -I./include/sse
+INCDIR=-I./include -I./include/oct -I./include/point -I./include/par -I./include/binOps -I./include/seq -I./include/omp_par -I./include/sse -I./include/gensort
 SRCDIR=./src
 OBJDIR=./obj
 LIBDIR=./lib
@@ -15,7 +15,7 @@ LIBS=
 
 
 CCFILES=main.cpp
-CFILES=par/parUtils.C binOps/binUtils.C oct/TreeNode.C
+CFILES=par/parUtils.C binOps/binUtils.C oct/TreeNode.C gensort/gensort.C gensort/rand16.C
 
 OBJS=$(CCFILES:%.cpp=$(OBJDIR)/%.o) \
      $(CFILES:%.C=$(OBJDIR)/%.o)

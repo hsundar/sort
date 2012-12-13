@@ -1985,8 +1985,8 @@ namespace par {
       assert(arr.size());
 
       if (npes == 1) {
-        std::cout <<" have to use seq. sort"
-          <<" since npes = 1 . inpSize: "<<(arr.size()) <<std::endl;
+
+        // std::cout <<" have to use seq. sort" <<" since npes = 1 . inpSize: "<<(arr.size()) <<std::endl;
 //        std::sort(arr.begin(), arr.end());
         omp_par::merge_sort(&arr[0],&arr[arr.size()]);
         SortedElem  = arr;
