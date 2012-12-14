@@ -110,7 +110,8 @@ bool verify(std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
 
   for(long j=0;j<in.size();j++)
     if(in[j]!=out[j]){
-      std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
+      std::cout<<"Failed at:"<<j<<'\n';
+//      std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
       return false;
     }
 

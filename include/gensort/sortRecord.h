@@ -1,5 +1,6 @@
 #ifndef __SORT_RECORD_H_
 #define __SORT_RECORD_H_
+#include <iostream>
 
 class sortRecord {
 private:
@@ -32,6 +33,13 @@ public:
   }
   bool  operator >= ( sortRecord const  &other) const {
     return (memcmp(this->key, other.key, 10) >= 0);
+  }
+  bool  operator != ( sortRecord const  &other) const {
+    return (memcmp(this->key, other.key, 100) != 0);
+  }
+  friend std::ostream& operator<<(std::ostream& os, const sortRecord& r1){
+    os << r1.key << ' ' << r1.value << '\n';
+    return os;
   }
 }; 
 

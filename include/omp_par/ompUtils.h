@@ -12,6 +12,9 @@ namespace omp_par {
   template <class T>
     void merge_sort(T A,T A_last);
 
+  template <class T>
+    void merge_sort_ptrs(T A,T A_last);
+
   template <class T, class I>
     T reduce(T* A, I cnt);
 

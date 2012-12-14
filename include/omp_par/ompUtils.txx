@@ -136,7 +136,47 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
 template <class T>
 void omp_par::merge_sort(T A,T A_last){
   typedef typename std::iterator_traits<T>::value_type _ValType;
-  omp_par::merge_sort(A,A_last,std::less<_ValType>());
+  if(sizeof(_ValType)<=2*sizeof(_ValType*))
+    omp_par::merge_sort(A,A_last,std::less<_ValType>());
+  else
+    omp_par::merge_sort_ptrs(A,A_last);
+}
+
+template <class T>
+class DataPtr{
+public:
+  T* elem;
+
+  bool  operator < ( DataPtr<T> const  &other) const {
+    return ((*elem)<(*(other.elem)));
+  }
+};
+
+template <class T>
+void omp_par::merge_sort_ptrs(T A,T A_last){
+  //std::cout<<"Using Pointer sort.\n";
+  typedef typename std::iterator_traits<T>::difference_type _DiffType;
+  typedef typename std::iterator_traits<T>::value_type _ValType;
+  _DiffType N=A_last-A; 
+
+  // Make copy and
+  _ValType* C=new _ValType[N];
+  memcpy(C, A, N*sizeof(_ValType));
+
+  // Init pointer array to be sorted.
+  DataPtr<_ValType>* B=new DataPtr<_ValType>[N];
+  #pragma omp parallel for
+  for(size_t i=0;i<N;i++) B[i].elem=&C[0]+i;
+
+  // Sort pointers.
+  omp_par::merge_sort(B,B+N,std::less<DataPtr<_ValType> >());
+
+  // Copy data to its sorted position.
+  #pragma omp parallel for
+  for(size_t i=0;i<N;i++) A[i]=*(B[i].elem);
+
+  delete[] B;
+  delete[] C;
 }
 
 template <class T, class I>
