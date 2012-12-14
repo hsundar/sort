@@ -85,5 +85,20 @@ namespace binOp {
     return  (v >> 1);
   }
 
+  unsigned int reversibleHash(unsigned int x) {
+    x*=0xDEADBEEF;
+    x=x^(x>>17);
+    x*=0x01234567;
+    x+=0x88776655;
+    x=x^(x>>4);
+    x=x^(x>>9);
+    x*=0x91827363;
+    x=x^(x>>7);
+    x=x^(x>>11);
+    x=x^(x>>20);
+    x*=0x77773333;
+    return x;
+  }
+
 }//end namespace
 

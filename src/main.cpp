@@ -5,6 +5,7 @@
 #include <vector>
 #include <omp.h>
 #include <sstream>
+#include <binUtils.h>
 #include <ompUtils.h>
 #include <parUtils.h>
 #include <octUtils.h>
@@ -15,8 +16,9 @@
 
 #define MAX_DEPTH 30
 #define SORT_FUNCTION par::HyperQuickSort
-//#define SORT_FUNCTION par::sampleSort
-//#define __VERIFY__
+
+// #define SORT_FUNCTION par::sampleSort
+// #define __VERIFY__
 
 long getNumElements(char* code) {
   unsigned int slen = strlen(code);
@@ -135,6 +137,7 @@ double time_sort_bench(size_t N, MPI_Comm comm) {
 
   // Warmup run and verification.
   SORT_FUNCTION<Data_t>(in, out, comm);
+  // SORT_FUNCTION<Data_t>(in_cpy, comm);
   in=in_cpy;
 #ifdef __VERIFY__
   verify(in,out,comm);
@@ -144,6 +147,7 @@ double time_sort_bench(size_t N, MPI_Comm comm) {
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
   SORT_FUNCTION<Data_t>(in, out, comm);
+  // SORT_FUNCTION<Data_t>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
 
@@ -161,17 +165,21 @@ double time_sort_tn(size_t N, MPI_Comm comm) {
   typedef ot::TreeNode Data_t;
   std::vector<Data_t> in(N);
   unsigned int s = (1u << MAX_DEPTH);
-  for(int i=0;i<N;i++){
-    ot::TreeNode node(rand()%s, rand()%s, rand()%s, MAX_DEPTH-1, 3, MAX_DEPTH);
+#pragma omp parallel for
+  for(unsigned int i=0;i<N;i++){
+    // ot::TreeNode node(rand()%s, rand()%s, rand()%s, MAX_DEPTH-1, 3, MAX_DEPTH);
+    ot::TreeNode node(binOp::reversibleHash(3*i*myrank)%s, binOp::reversibleHash(3*i*myrank+1)%s, binOp::reversibleHash(3*i*myrank+2)%s, MAX_DEPTH-1, 3, MAX_DEPTH);
     in[i]=node; 
   }
   
+  // std::cout << "finished generating data " << std::endl;
   std::vector<Data_t> in_cpy=in;
   std::vector<Data_t> out;
 
   // Warmup run and verification.
   SORT_FUNCTION<Data_t>(in, out, comm);
   in=in_cpy;
+  // SORT_FUNCTION<Data_t>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
 #endif
@@ -180,6 +188,7 @@ double time_sort_tn(size_t N, MPI_Comm comm) {
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
   SORT_FUNCTION<Data_t>(in, out, comm);
+  // SORT_FUNCTION<Data_t>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
 
@@ -201,13 +210,17 @@ double time_sort(size_t N, MPI_Comm comm){
   srand(/*omp_get_wtime()+*/myrank+1);
 
   std::vector<T> in(N);
-  for(int i=0;i<N;i++) in[i]=rand(); 
+#pragma omp parallel for
+  for(unsigned int i=0;i<N;i++) in[i]=binOp::reversibleHash(myrank*i); 
+  // for(unsigned int i=0;i<N;i++) in[i]=rand(); 
+  // std::cout << "finished generating data " << std::endl;
   std::vector<T> in_cpy=in;
   std::vector<T> out;
 
   // Warmup run and verification.
   SORT_FUNCTION<T>(in, out, comm);
   in=in_cpy;
+  // SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
 #endif
@@ -216,6 +229,7 @@ double time_sort(size_t N, MPI_Comm comm){
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
   SORT_FUNCTION<T>(in, out, comm);
+  // SORT_FUNCTION<T>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
 
@@ -236,11 +250,11 @@ int main(int argc, char **argv){
 
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
 
-  // Initialize MPI
-  MPI_Init(&argc, &argv);
-
   //Set number of OpenMP threads to use.
   omp_set_num_threads(atoi(argv[1]));
+
+  // Initialize MPI
+  MPI_Init(&argc, &argv);
 
   // Find out my identity in the default communicator 
   int myrank;
@@ -265,8 +279,9 @@ int main(int argc, char **argv){
     std::cerr << "illegal typeSize code provided: " << argv[2] << std::endl;
     return 2;
   }
-
-  // std::cout << "local array of size " << N << " of type " << dtype << std::endl;
+ 
+  if (!myrank)
+    std::cout << "sorting array of size " << N*p << " of type " << dtype << std::endl;
 
   // check if arguments are ok ...
     

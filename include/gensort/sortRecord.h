@@ -15,10 +15,16 @@ public:
   bool  operator == ( sortRecord const  &other) const {
     return (memcmp(this->key, other.key, 10) == 0);
     // return ( (this->eka == other.eka) && (this->dva == other.dva) );
+    // return ( (*(unsigned long*)(this->key) == *(unsigned long*)(other.key)) &&  (*(unsigned short*)(this->key+8) == *(unsigned short*)(other.key+8)) );
   }
   bool  operator < ( sortRecord const  &other) const {
     return (memcmp(this->key, other.key, 10) < 0);
+    
     /*
+    if (*(long*)(this->key) == *(long*)(other.key)) 
+      return (*(unsigned short*)(this->key+8) < *(unsigned short*)(other.key+8)); 
+    else
+      return (*(unsigned long*)(this->key) < *(unsigned long*)(other.key)); 
     if (this->eka == other.eka)
       return this->dva < other.dva;
     else

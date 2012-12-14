@@ -400,6 +400,9 @@ namespace par {
   template<typename T>
     int HyperQuickSort(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 
+  /* mem-efficient version */
+  template<typename T>
+    int HyperQuickSort(std::vector<T>& arr, MPI_Comm comm);
   /**
     @brief A parallel sample sort implementation. In our implementation, we do not pose any 
     restriction on the input or the number of processors. This function can be used with an odd number of processors as well.
@@ -578,18 +581,4 @@ namespace par {
 #endif
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
