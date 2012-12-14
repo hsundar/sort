@@ -57,6 +57,12 @@ namespace binOp{
     */
   int getPrevHighestPowerOfTwo(unsigned int n);
 
+  /**
+   * psuedo random generator ... kind of ...
+   */
+  unsigned int reversibleHash(unsigned int x);
+
+
 }//end namespace
 
 #endif
