@@ -126,8 +126,6 @@ double time_sort_bench(size_t N, MPI_Comm comm) {
   MPI_Comm_rank(comm, &myrank);
   MPI_Comm_size(comm,&p);
 
-  srand(myrank+1);
-
   typedef sortRecord Data_t;
   std::vector<Data_t> in(N);
   genRecords((char* )&(*(in.begin())), myrank, N);
@@ -159,17 +157,21 @@ double time_sort_tn(size_t N, MPI_Comm comm) {
 
   MPI_Comm_rank(comm, &myrank);
   MPI_Comm_size(comm,&p);
-
-  srand(myrank+1);
+  int omp_p=omp_get_max_threads();
 
   typedef ot::TreeNode Data_t;
   std::vector<Data_t> in(N);
   unsigned int s = (1u << MAX_DEPTH);
 #pragma omp parallel for
-  for(unsigned int i=0;i<N;i++){
-    // ot::TreeNode node(rand()%s, rand()%s, rand()%s, MAX_DEPTH-1, 3, MAX_DEPTH);
-    ot::TreeNode node(binOp::reversibleHash(3*i*myrank)%s, binOp::reversibleHash(3*i*myrank+1)%s, binOp::reversibleHash(3*i*myrank+2)%s, MAX_DEPTH-1, 3, MAX_DEPTH);
-    in[i]=node; 
+  for(int j=0;j<omp_p;j++){
+    unsigned int seed=j*p+myrank;
+    size_t start=(j*N)/omp_p;
+    size_t end=((j+1)*N)/omp_p;
+    for(unsigned int i=start;i<end;i++){ 
+      ot::TreeNode node(rand_r(&seed)%s, rand_r(&seed)%s, rand_r(&seed)%s, MAX_DEPTH-1, 3, MAX_DEPTH);
+      // ot::TreeNode node(binOp::reversibleHash(3*i*myrank)%s, binOp::reversibleHash(3*i*myrank+1)%s, binOp::reversibleHash(3*i*myrank+2)%s, MAX_DEPTH-1, 3, MAX_DEPTH);
+      in[i]=node; 
+    }
   }
   
   // std::cout << "finished generating data " << std::endl;
@@ -197,22 +199,24 @@ double time_sort_tn(size_t N, MPI_Comm comm) {
 
 template <class T>
 double time_sort(size_t N, MPI_Comm comm){
+  int myrank, p;
 
-  // Find out my identity in the default communicator 
-  int myrank;
   MPI_Comm_rank(comm, &myrank);
-
-  // Find out number of processes
-  int p;
   MPI_Comm_size(comm,&p);
+  int omp_p=omp_get_max_threads();
 
   // Geerate random data
-  srand(/*omp_get_wtime()+*/myrank+1);
-
   std::vector<T> in(N);
 #pragma omp parallel for
-  for(unsigned int i=0;i<N;i++) in[i]=binOp::reversibleHash(myrank*i); 
-  // for(unsigned int i=0;i<N;i++) in[i]=rand(); 
+  for(int j=0;j<omp_p;j++){
+    unsigned int seed=j*p+myrank;
+    size_t start=(j*N)/omp_p;
+    size_t end=((j+1)*N)/omp_p;
+    for(unsigned int i=start;i<end;i++){ 
+      in[i]=rand_r(&seed);
+    }
+  }
+  // for(unsigned int i=0;i<N;i++) in[i]=binOp::reversibleHash(myrank*i); 
   // std::cout << "finished generating data " << std::endl;
   std::vector<T> in_cpy=in;
   std::vector<T> out;

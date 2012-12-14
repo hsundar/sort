@@ -136,7 +136,7 @@ void omp_par::merge_sort(T A,T A_last,StrictWeakOrdering comp){
 template <class T>
 void omp_par::merge_sort(T A,T A_last){
   typedef typename std::iterator_traits<T>::value_type _ValType;
-  if(sizeof(_ValType)<=2*sizeof(_ValType*))
+  if(sizeof(_ValType)<=8*sizeof(_ValType*))
     omp_par::merge_sort(A,A_last,std::less<_ValType>());
   else
     omp_par::merge_sort_ptrs(A,A_last);
