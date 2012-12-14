@@ -143,11 +143,11 @@ void omp_par::merge_sort(T A,T A_last){
 }
 
 template <class T>
-class DataPtr{
+struct DataPtr{
 public:
   T* elem;
 
-  bool  operator < ( DataPtr<T> const  &other) const {
+  inline bool  operator < ( DataPtr<T> const  &other) const {
     return ((*elem)<(*(other.elem)));
   }
 };
@@ -155,25 +155,32 @@ public:
 template <class T>
 void omp_par::merge_sort_ptrs(T A,T A_last){
   //std::cout<<"Using Pointer sort.\n";
+  int p=omp_get_max_threads();
   typedef typename std::iterator_traits<T>::difference_type _DiffType;
   typedef typename std::iterator_traits<T>::value_type _ValType;
   _DiffType N=A_last-A; 
 
-  // Make copy and
-  _ValType* C=new _ValType[N];
-  memcpy(C, A, N*sizeof(_ValType));
-
-  // Init pointer array to be sorted.
+  // Make copy and init pointer array to be sorted.
   DataPtr<_ValType>* B=new DataPtr<_ValType>[N];
+  _ValType* C=new _ValType[N];
   #pragma omp parallel for
-  for(size_t i=0;i<N;i++) B[i].elem=&C[0]+i;
+  for(int i=0;i<p;i++){
+    _DiffType start=(N*i)/p;
+    _DiffType end=(N*(i+1))/p;
+    memcpy(&C[start], &A[start], (end-start)*sizeof(_ValType));
+    for(_DiffType j=start;j<end;j++) B[j].elem=&C[0]+j;
+  }
 
   // Sort pointers.
   omp_par::merge_sort(B,B+N,std::less<DataPtr<_ValType> >());
 
   // Copy data to its sorted position.
   #pragma omp parallel for
-  for(size_t i=0;i<N;i++) A[i]=*(B[i].elem);
+  for(int i=0;i<p;i++){
+    _DiffType start=(N*i)/p;
+    _DiffType end=(N*(i+1))/p;
+    for(size_t j=start;j<end;j++) A[j]=*(B[j].elem);
+  }
 
   delete[] B;
   delete[] C;
