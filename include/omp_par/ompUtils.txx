@@ -12,6 +12,18 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
 
   _DiffType N1=A_last-A_;
   _DiffType N2=B_last-B_;
+  if(N1==0 && N2==0) return;
+  if(N1==0 || N2==0){
+    _ValType* A=(N1==0? &B_[0]: &A_[0]);
+    _DiffType N=(N1==0?  N2  :  N1   );
+    #pragma omp parallel for
+    for(int i=0;i<p;i++){
+      _DiffType indx1=( i   *N)/p;
+      _DiffType indx2=((i+1)*N)/p;
+      memcpy(&C_[indx1], &A[indx1], (indx2-indx1)*sizeof(_ValType));
+    }
+    return;
+  }
 
   //Split both arrays ( A and B ) into n equal parts.
   //Find the position of each split in the final merged array.
