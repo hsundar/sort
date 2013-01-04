@@ -49,6 +49,7 @@ class Traits<int>{
 
 };
 
+
 template <>
 class Traits<float>{
   public:
@@ -86,7 +87,7 @@ class Traits<long>{
     // sse comparator function
     // ...
 };
-*/
+
 
 template <>
 class Traits<double>{
@@ -95,7 +96,7 @@ class Traits<double>{
     // sse comparator function
     // ...
 };
-
+*/
 
 
 // Generic.

@@ -1,0 +1,3 @@
+[submodule "paper"]
+	path = paper
+	url = /org/groups/padas/repo/papers/2013/ics-sort.git

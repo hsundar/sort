@@ -46,20 +46,22 @@ long getNumElements(char* code) {
   };
 
   switch (dtype) {
+    case 'd': // double array
+      return numBytes/sizeof(double);
+      break;
+    case 'f': // float array
+      return numBytes/sizeof(float);
+      break;
     case 'i': // int array
-      // std::cout << "Int : " << sizeof(int) << std::endl;
       return numBytes/sizeof(int);
       break;
     case 'l': // long array
-      // std::cout << "Long : " << sizeof(long) << std::endl;
       return numBytes/sizeof(long);
       break;
     case 't': // treenode
-      // std::cout << "TreeNode : " << sizeof(ot::TreeNode) << std::endl;
       return numBytes/sizeof(ot::TreeNode);
       break;
     case 'x': // gensort record
-      // std::cout << "sortRecord : " << sizeof(sortRecord) << std::endl;
       return numBytes/sizeof(sortRecord);
       break;
     default:
@@ -244,6 +246,7 @@ int main(int argc, char **argv){
   if (argc < 3) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
+		std::cerr << "\t\t typeSize can be d-double, f-float, i-int, l-long, t-TreeNode or x-100byte record." << std::endl;
     std::cerr << "\t\t Examples:" << std::endl;
     std::cerr << "\t\t i1GB : integer  array of size 1GB" << std::endl;
     std::cerr << "\t\t l1GB : long     array of size 1GB" << std::endl;
@@ -293,9 +296,15 @@ int main(int argc, char **argv){
     double ttt;
     
     switch(dtype) {
-      case 'i':
-        ttt = time_sort<int>(N, MPI_COMM_WORLD);
-        break;
+			case 'd':
+				ttt = time_sort<double>(N, MPI_COMM_WORLD);
+				break;
+			case 'f':
+				ttt = time_sort<float>(N, MPI_COMM_WORLD);
+				break;	
+			case 'i':
+				ttt = time_sort<int>(N, MPI_COMM_WORLD);
+				break;
       case 'l':
         ttt = time_sort<long>(N, MPI_COMM_WORLD);
         break;
@@ -316,7 +325,13 @@ int main(int argc, char **argv){
     double ttt;
 
     switch(dtype) {
-      case 'i':
+			case 'd':
+				ttt = time_sort<double>(N, comm);
+				break;
+			case 'f':
+				ttt = time_sort<float>(N, comm);
+				break;	
+			case 'i':
         ttt = time_sort<int>(N, comm);
         break;
       case 'l':
