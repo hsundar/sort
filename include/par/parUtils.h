@@ -390,6 +390,27 @@ namespace par {
     int concatenate(std::vector<T> & listA,
         std::vector<T> & listB, MPI_Comm comm);
 
+	template<typename T>
+		std::vector<T> Sorted_approx_Select(std::vector<T>& arr, unsigned int k, MPI_Comm comm);
+	template<typename T>
+		std::vector<T> GetRangeMean(std::vector<T>& arr, std::vector<unsigned int> range_min, std::vector<unsigned int> range_max, MPI_Comm comm);
+	template<typename T>
+		std::vector<T> GuessRangeMedian(std::vector<T>& arr, std::vector<unsigned int> range_min, std::vector<unsigned int> range_max, MPI_Comm comm);
+
+		/** @brief A parallel k-selection algorithms
+			
+			@author Hari Sundar 
+			@date 2013-01-10
+			@param  arr				arr from which samples are to be selected
+			@param  k					number of samples
+			@param  isSorted	if false, arr is locally sorted first.
+			@return list of k keys. 
+		**/
+		template<typename T>
+				std::vector<T> Sorted_k_Select(std::vector<T>& arr, std::vector<unsigned int> min_idx, std::vector<unsigned int> max_idx, std::vector<DendroIntL> K, std::vector<T> guess, MPI_Comm comm);
+			
+		
+
   /**
     @brief A parallel hyper quick sort implementation.
     @author Dhairya Malhotra
@@ -400,6 +421,9 @@ namespace par {
   template<typename T>
     int HyperQuickSort(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 
+  template<typename T>
+    int HyperQuickSort_kway(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm, unsigned int kway=8); 
+		
   /* mem-efficient version */
   template<typename T>
     int HyperQuickSort(std::vector<T>& arr, MPI_Comm comm);
