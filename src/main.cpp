@@ -223,6 +223,40 @@ double time_sort(size_t N, MPI_Comm comm){
   std::vector<T> in_cpy=in;
   std::vector<T> out;
 
+	unsigned int kway = 7;
+	DendroIntL Nglobal=p*N;
+	
+	std::vector<unsigned int> min_idx(kway), max_idx(kway); 
+	std::vector<DendroIntL> K(kway);
+	for(size_t i = 0; i < kway; ++i)
+	{
+		min_idx[i] = 0;
+		max_idx[i] = N;
+		K[i] = (Nglobal*(i+1))/(kway+1);
+	}
+	
+	std::sort(in.begin(), in.end());
+	
+	double tselect =- omp_get_wtime();
+	std::vector<T> guess = par::GuessRangeMedian<T>(in, min_idx, max_idx, comm);
+	std::vector<T> slct = par::Sorted_k_Select<T>(in, min_idx, max_idx, K, guess, comm);
+	tselect += omp_get_wtime();
+	
+	double pselect =- omp_get_wtime();
+	std::vector<T> pslct = par::Sorted_approx_Select(in, kway, comm);
+	pselect += omp_get_wtime();
+	
+	if (!myrank) {
+		for(size_t i = 0; i < kway; ++i)
+		{
+			std::cout << slct[i] << " " << pslct[i] << std::endl;
+		}
+		std::cout << "times: " << tselect << " " << pselect << std::endl;
+	}
+	
+	
+	return 0.0;
+
   // Warmup run and verification.
   SORT_FUNCTION<T>(in, out, comm);
   in=in_cpy;
@@ -319,6 +353,8 @@ int main(int argc, char **argv){
       tt[100*k+0]=ttt;
     }
   }
+	MPI_Finalize();
+	return 0;
   { // smaller /2^k runs 
     int myrank_;
     MPI_Comm_rank(comm, &myrank_);
