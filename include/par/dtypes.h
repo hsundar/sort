@@ -28,6 +28,9 @@ to this user-defined datatype.
     template <typename T>
     class Mpi_datatype;
 
+		template <typename T1, typename T2>
+		class Mpi_pairtype;
+
 #define HS_MPIDATATYPE(CTYPE, MPITYPE)	\
 	template <>  \
 		class Mpi_datatype<CTYPE> \
@@ -56,6 +59,27 @@ to this user-defined datatype.
 
 #undef HS_MPIDATATYPE
 
+#define HS_MPIPAIRDATATYPE(CTYPE1, CTYPE2, MPITYPE)	\
+	template <>  \
+		class Mpi_pairtype<CTYPE1, CTYPE2> \
+		{  \
+		    public: \
+			static MPI_Datatype value() {\
+                          return MPITYPE;\
+                        } \
+		};
+
+    HS_MPIPAIRDATATYPE(float, 			int,		MPI_FLOAT_INT)
+		HS_MPIPAIRDATATYPE(double, 			int, 		MPI_DOUBLE_INT)
+		HS_MPIPAIRDATATYPE(long, 				int,    MPI_LONG_INT)		
+	  HS_MPIPAIRDATATYPE(int, 				int,  	MPI_2INT)
+		HS_MPIPAIRDATATYPE(short, 			int,  	MPI_SHORT_INT)
+		HS_MPIPAIRDATATYPE(long double, int,    MPI_LONG_DOUBLE_INT)
+				
+#undef HS_MPIPAIRDATATYPE
+
+		
+
     template <typename T>
     class Mpi_datatype<std::complex<T> > {
     public:
@@ -67,6 +91,35 @@ to this user-defined datatype.
             if (first) {
                 first = false;
                 MPI_Type_contiguous(2, Mpi_datatype<T>::value(), &datatype);
+                MPI_Type_commit(&datatype);
+            }
+
+            return datatype;
+        }
+    };
+
+    template <typename T1, typename T2>
+    class Mpi_pairtype {
+    public:
+        static MPI_Datatype value()
+        {
+            static bool         first = true;
+            static MPI_Datatype datatype;
+
+            if (first) {
+                first = false;
+								int block[2];  
+								MPI_Aint disp[2];
+								MPI_Datatype type[2];
+			
+								block[0] = 1;
+								block[0] = 1;
+								type[0] = Mpi_datatype<T1>::value(); 
+								type[1] = Mpi_datatype<T2>::value(); 
+								disp[0] = 0; 
+								disp[1] = sizeof(T1); 
+								
+								MPI_Type_create_struct(2, block, disp, type, &datatype);
                 MPI_Type_commit(&datatype);
             }
 
