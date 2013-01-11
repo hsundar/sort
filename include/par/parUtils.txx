@@ -2994,11 +2994,10 @@ namespace par {
       DendroIntL totSize, nelem = arr.size(); 
       par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 			
-			
 			//Determine splitters. O( log(N/p) + log(p) )        
-      int splt_count=(1000*nelem)/totSize; 
-      if(npes>1000) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?1:0);
-      if(splt_count>nelem) splt_count=nelem;
+      int splt_count=(kway*1000*nelem)/totSize; 
+      if (npes>1000) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?kway:0);
+      if (splt_count>nelem) splt_count=nelem;
       std::vector<T> splitters(splt_count);
       for(size_t i=0;i<splt_count;i++) 
         splitters[i]=arr[rand()%nelem];
