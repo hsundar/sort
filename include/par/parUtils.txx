@@ -2275,7 +2275,7 @@ namespace par {
 				2. send recv with kway-1 partners - asynchronous 
 				3. merge received buffers 
 				*/
-				unsigned int my_chunk = myrank / (totSize/kway);
+				unsigned int my_chunk = myrank / (npes/kway);
 				unsigned int overhang = npes%kway;
 				size_t new_np[kway], new_p0[kway]; 
 				for(size_t q = 0; q < kway; ++q) new_np[q] = (q < overhang)?(npes/kway + 1):(npes/kway);
@@ -3000,7 +3000,7 @@ namespace par {
       if (splt_count>nelem) splt_count=nelem;
       std::vector<T> splitters(splt_count);
       for(size_t i=0;i<splt_count;i++) 
-        splitters[i]=arr[rand()%nelem];
+        splitters[i] = arr[rand()%nelem];
 
       // Gather all splitters. O( log(p) )
       int glb_splt_count;
@@ -3008,7 +3008,7 @@ namespace par {
       std::vector<int> glb_splt_disp(npes,0);
       par::Mpi_Allgather<int>(&splt_count, &glb_splt_cnts[0], 1, comm);
       omp_par::scan(&glb_splt_cnts[0],&glb_splt_disp[0],npes);
-      glb_splt_count=glb_splt_cnts[npes-1]+glb_splt_disp[npes-1];
+      glb_splt_count = glb_splt_cnts[npes-1] + glb_splt_disp[npes-1];
       std::vector<T> glb_splitters(glb_splt_count);
       MPI_Allgatherv(&    splitters[0], splt_count, par::Mpi_datatype<T>::value(), 
                      &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
@@ -3026,22 +3026,16 @@ namespace par {
       // rank splitters. O( log(N/p) + log(p) )
       std::vector<DendroIntL> disp(glb_splt_count,0);
       if(nelem>0){
-        // #pragma omp parallel for
-        for(size_t i=0;i<glb_splt_count;i++){
-          // disp[i]=std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
-          disp[i] = (std::upper_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0]);
+        #pragma omp parallel for
+        for(size_t i=0; i<glb_splt_count; i++){
+          disp[i] = std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
         }
       }
       std::vector<DendroIntL> glb_disp(glb_splt_count, 0);
       MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
         
-      /*
-      for(size_t i=0;i<glb_splt_count;i++){
-        if (!rank) std::cout << glb_splitters[i] << " " << glb_disp[i] << std::endl;
-      }
-      */
 	    std::vector<T> split_keys(kway);
-			// #pragma omp parallel for
+			#pragma omp parallel for
       for (unsigned int qq=0; qq<kway; qq++) {
 				DendroIntL* _disp = &glb_disp[0];
 				DendroIntL optSplitter = ((qq+1)*totSize)/(kway+1);
@@ -3053,8 +3047,6 @@ namespace par {
 				}
         split_keys[qq] = glb_splitters[_disp - &glb_disp[0]];
 			}
-			
-      //-------------------------------------------
 			
 			return split_keys;
 		}	
