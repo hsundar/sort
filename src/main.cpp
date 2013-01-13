@@ -26,7 +26,7 @@ long getNumElements(char* code) {
   char tmp[128];
   strncpy(tmp, code+1, slen-3); tmp[slen-3] = '\0';
   // std::cout << "tmp is " << tmp << std::endl;
-  long numBytes = atoi(tmp);
+  long numBytes = atol(tmp);
   switch(code[slen-2]) {
     case 'g':
     case 'G':

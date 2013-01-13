@@ -2995,7 +2995,7 @@ namespace par {
       par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 			
 			//Determine splitters. O( log(N/p) + log(p) )        
-      int splt_count=(kway*1000*nelem)/totSize; 
+      int splt_count = (kway*1000*nelem)/totSize; 
       if (npes>1000) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?kway:0);
       if (splt_count>nelem) splt_count=nelem;
       std::vector<T> splitters(splt_count);
@@ -3014,36 +3014,47 @@ namespace par {
                      &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
                      par::Mpi_datatype<T>::value(), comm);
 
+      /*
+      if (!rank) {
+        std::cout << "global splitters ";
+        for (int i=0; i<glb_splt_count; ++i)
+          std::cout << glb_splitters[i] << " ";
+        std::cout << std::endl << std::endl;
+      }
+      */
+
       // rank splitters. O( log(N/p) + log(p) )
       std::vector<DendroIntL> disp(glb_splt_count,0);
       if(nelem>0){
-        #pragma omp parallel for
+        // #pragma omp parallel for
         for(size_t i=0;i<glb_splt_count;i++){
-          disp[i]=std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
+          // disp[i]=std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
+          disp[i] = (std::upper_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0]);
         }
       }
       std::vector<DendroIntL> glb_disp(glb_splt_count, 0);
       MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
-
-      DendroIntL* split_disp[kway]; //  = &glb_disp[0];
-			for (unsigned int qq=0; qq<kway; qq++)
-				split_disp[qq] = &glb_disp[0];
-			#pragma omp parallel for
+        
+      /*
+      for(size_t i=0;i<glb_splt_count;i++){
+        if (!rank) std::cout << glb_splitters[i] << " " << glb_disp[i] << std::endl;
+      }
+      */
+	    std::vector<T> split_keys(kway);
+			// #pragma omp parallel for
       for (unsigned int qq=0; qq<kway; qq++) {
+				DendroIntL* _disp = &glb_disp[0];
 				DendroIntL optSplitter = ((qq+1)*totSize)/(kway+1);
-				for(size_t i=0; i<glb_splt_count; i++) {
-        	if(abs(glb_disp[i] - optSplitter) < abs(*split_disp[qq] - optSplitter)) {
-						split_disp[qq] = &glb_disp[i];
+        // if (!rank) std::cout << "opt " << qq << " - " << optSplitter << std::endl;
+        for(size_t i=0; i<glb_splt_count; i++) {
+        	if(labs(glb_disp[i] - optSplitter) < labs(*_disp - optSplitter)) {
+						_disp = &glb_disp[i];
 					}
 				}
+        split_keys[qq] = glb_splitters[_disp - &glb_disp[0]];
 			}
-				
-	    std::vector<T> split_keys(kway);
-      	
-			for (unsigned int qq=0; qq<kway; qq++) {
-				split_keys[qq] = glb_splitters[split_disp[qq] - &glb_disp[0]];
-			}
-			//-------------------------------------------
+			
+      //-------------------------------------------
 			
 			return split_keys;
 		}	
