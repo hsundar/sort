@@ -2218,7 +2218,8 @@ namespace par {
 		      kway = npes; 
 				
 				std::vector<T> split_key = par::Sorted_approx_Select(arr_, kway-1, comm); // select kway-1 splitters 
-							
+					
+#ifdef _DEBUG_			
 				if (!myrank) 
 				{
 					std::cout << "kway = " << kway << std::endl;
@@ -2229,6 +2230,7 @@ namespace par {
 					}
 					std::cout << std::endl;				
 				}
+#endif
 				/*
 				1. exchange send sizes - kway
 				2. send recv with kway-1 partners - asynchronous 
@@ -2257,24 +2259,26 @@ namespace par {
 					T my_low  = my_chunk?split_key[my_chunk-1]:arr_[0];
 					size_t my_indx_low  = (nelem >0 ? std::lower_bound(&arr_[0], &arr_[nelem], my_low)  - &arr_[0]:0);
 					unsigned int r = my_indx_low;
-					while( (r<nelem) && (arr_[r]<split_key[my_chunk]) ) lbuff.push_back(arr_[r++]);
+					if ( my_chunk == (kway-1) ) {
+						while( (r<nelem) ) lbuff.push_back(arr_[r++]);
+					} else {
+						while( (r<nelem) && (arr_[r]<split_key[my_chunk]) ) lbuff.push_back(arr_[r++]);
+					}
 				}
-				if (!myrank) std::cout << "local size:  " << std::endl;	
+				// std::cout << myrank << ":  local size = " << lbuff.size() <<  std::endl;	
 				// if (!myrank) std::cout << "starting iSend/Recv" << std::endl;
 				
 				// first iSend/iRecv cnts ...
-				int rsize[kway], ssize[kway];  
-				T *sbuff[kway];
-				int ext_rsize[kway];
-				MPI_Request requests[kway]; 
-				MPI_Request ext_requests[kway]; 
-				MPI_Request sRequests;
-				MPI_Status  statuses[kway];
-
-				int r_cnt=0, er_cnt=0;
+				std::vector<int> rsize(2*kway);
+				int ssize[kway]; 
+				T* sbuff[kway];
+				
+				std::vector<MPI_Request> requests; 
+				MPI_Request sRequests, rq;	
+				MPI_Status  statuses[2*(kway-1)]; // overallocate 
+				int r_idx=0; 
 				for(size_t q = 0; q < kway; ++q) 
-				{
-					// requests[q] = 0; ext_requests[q] = 0;
+				{	
 					if (my_chunk == q) continue; // skip self
 					int partner = (new_pid < new_np[q]? new_p0[q] + new_pid: new_np[q]-1) ;
 					bool have_extra = overhang && (q >= overhang) && ((new_p0[q]+new_np[q]-1) == myrank );
@@ -2300,103 +2304,85 @@ namespace par {
 	
 				  ssize[q] = ( split_indx_high - split_indx_low );
 					sbuff[q] = &arr_[split_indx_low];
-	
+						
 					// iRecv
-				  par::Mpi_Irecv<int>( &(rsize[q]), 1, partner, 1, comm, &(requests[r_cnt++]) );
+					par::Mpi_Irecv<int>( &(rsize[r_idx]), 1, partner, 1, comm, &(rq) );
+					requests.push_back(rq); r_idx++;
 					// iSend 
 					par::Mpi_Issend<int>( &(ssize[q]), 1, partner, 1, comm, &(sRequests) );
 					if (have_extra) {
 						int ext_ssize=0;
-						par::Mpi_Irecv<int> ( &(ext_rsize[q]), 1, extra_partner, 1, comm, &(ext_requests[er_cnt++]) );
+						par::Mpi_Irecv<int> ( &(rsize[r_idx]), 1, extra_partner, 1, comm, &(rq) );
+						requests.push_back(rq); r_idx++;
 						par::Mpi_Issend<int>( &(ext_ssize),    1, extra_partner, 1, comm, &(sRequests) );
-					}					
+					} 					
 				} // q - kway for counts
-						
+				rsize.resize(r_idx);		
 						
 				// no point overlapping here ...
-				MPI_Waitall(r_cnt, requests, statuses);
-				if (er_cnt) MPI_Waitall(er_cnt, ext_requests, statuses);
-
-				// if (!myrank) std::cout << "finished iSend/Recv cnts" << std::endl;
+				MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
+				requests.clear();
+				
 				// now send actual data ...
-				r_cnt=0; er_cnt=0;
-				T		*rbuff[kway], *ext_rbuff[kway];
+				std::vector<T*> rbuff(rsize.size());
+				r_idx=0; 
 				for(size_t q = 0; q < kway; ++q) 
 				{
-					rbuff[q] = NULL;
-					requests[q] = 0; ext_requests[q] = 0;
 					if (my_chunk == q) continue; // skip self
 					int partner = (new_pid < new_np[q]? new_p0[q]+new_pid: new_np[q]-1) ;
 					bool have_extra = overhang && (q >= overhang) && ((new_p0[q]+new_np[q]-1) == myrank );
 					int extra_partner = ((kway-1) == q)?npes-1:new_p0[q+1]-1;
 	
-				  rbuff[q] = new T[rsize[q]];
+				  rbuff[r_idx] = (rsize[r_idx]>0? new T[rsize[r_idx]]: NULL);
 					// iRecv
-				  par::Mpi_Irecv<T>( rbuff[q], rsize[q], partner, 1, comm, &(requests[r_cnt++]) );
+					par::Mpi_Irecv<T>( rbuff[r_idx], rsize[r_idx], partner, 1, comm, &(rq) );
+					requests.push_back(rq); r_idx++;
 					// iSend 
 					par::Mpi_Issend<T>( sbuff[q], ssize[q], partner, 1, comm, &(sRequests) );
 					if (have_extra) {
-						ext_rbuff[q] = (ext_rsize>0? new T[ext_rsize[q]]: NULL);
+						rbuff[r_idx] = (rsize[r_idx]>0? new T[rsize[r_idx]]: NULL);
 						// iRecv
-					  par::Mpi_Irecv<T>( ext_rbuff[q], ext_rsize[q], extra_partner, 1, comm, &(ext_requests[er_cnt++]) );
+					  par::Mpi_Irecv<T>( rbuff[r_idx], rsize[r_idx], extra_partner, 1, comm, &(rq) );
+						requests.push_back(rq); r_idx++;
 						// iSend 
 						par::Mpi_Issend<T>( NULL, 0, extra_partner, 1, comm, &(sRequests) );		
 					}
 				}
 				// if (!myrank) std::cout << "finished iSend/Recv data" << std::endl;
 				// overlap here 
-				int index[kway], count, remaining;
-				remaining = r_cnt;
+				int index[requests.size()], count, remaining;
+				remaining = requests.size();
 				while(remaining) {
-				  MPI_Waitsome(r_cnt, requests, &count, index, statuses);
+				  MPI_Waitsome(requests.size(), &(*(requests.begin())), &count, index, statuses);
 					if (count > 0)
 					{
 						// if (!myrank) std::cout << "waitsome - processed " << count << std::endl;
 						for(size_t p = 0; p < count; ++p)
 						{
 							int q = index[p];
-							if (my_chunk == q || !rsize[q]) continue;
-							//merge recv[index[p]] with local
+							if (!rsize[q]) continue;
+							// merge recv[index[p]] with local
 						  int nbuff_size = lbuff.size() + rsize[q];
-						  lbuff_tmp.reserve(nbuff_size);	
-						  omp_par::merge<T*>(&(*(lbuff.begin())), &(*(lbuff.end())), (T*)rbuff[q], (T*)&rbuff[q][rsize[q]], &(*(lbuff_tmp.begin())), omp_p, std::less<T>());
+						  lbuff_tmp.resize(nbuff_size);
+							// if (!myrank) std::cout << "merging " << lbuff.size() << " + " << rsize[q] << std::endl;	
+						  omp_par::merge<T*>(&(*(lbuff.begin())), &(*(lbuff.end())), rbuff[q], &(rbuff[q][rsize[q]]), &(*(lbuff_tmp.begin())), omp_p, std::less<T>());
 				      delete [] rbuff[q];
 							lbuff.swap(lbuff_tmp);
+							// if(!myrank) std::cout << "after merging:  " << lbuff.size() << " "  << lbuff_tmp.size() << std::endl;
 				 		  // TODO : Check if lbuff_tmp needs to be cleared ... 
 				 		  // lbuff_tmp.clear();				 
 						}
 						remaining = remaining - count;
 					} else {remaining = 0; } 
 				} // remaining 
-				// now the extra ones ... 
-				remaining = er_cnt;
-				while(remaining) {
-				  MPI_Waitsome(er_cnt, ext_requests, &count, index, statuses);
-					if (count > 0)
-					{
-						for(size_t p = 0; p < count; ++p)
-						{
-							int q = index[p];
-							if (my_chunk == q || !ext_rsize[q]) continue;
-							//merge recv[index[p]] with local
-						  int nbuff_size = lbuff.size() + ext_rsize[q];
-						  lbuff_tmp.reserve(nbuff_size);	
-						  // char* nbuff= new char[nbuff_size];
-						  omp_par::merge<T*>(&(*(lbuff.begin())), &(*(lbuff.end())), (T*)ext_rbuff[q], (T*)&ext_rbuff[q][rsize[q]], &(*(lbuff_tmp.begin())), omp_p, std::less<T>());
-				      lbuff.swap(lbuff_tmp);
-				 		  delete [] ext_rbuff[q];
-							// TODO : Check if lbuff_tmp needs to be cleared ... 
-				 		  // lbuff_tmp.clear();				 
-						}
-						remaining = remaining - count;
-					} else {remaining = 0; } 
-				} // remaining  
+				requests.clear(); rsize.clear(); rbuff.clear();
+	 
         arr_.swap(lbuff); lbuff.clear();
 				
-				if(!myrank) std::cout << nelem << " " << totSize << std::endl;
+				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
 				nelem = arr_.size();
 				par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
-				if(!myrank) std::cout << nelem << " " << totSize << std::endl;
+				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
 				// update range and totsize ...
 				// range[1]-range[0]>1 && totSize>0
 				
