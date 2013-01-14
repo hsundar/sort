@@ -15,10 +15,10 @@
 #include <sortRecord.h>
 
 #define MAX_DEPTH 30
-#define SORT_FUNCTION par::HyperQuickSort
+#define SORT_FUNCTION par::HyperQuickSort_kway
 
 // #define SORT_FUNCTION par::sampleSort
-// #define __VERIFY__
+#define __VERIFY__
 
 long getNumElements(char* code) {
   unsigned int slen = strlen(code);
@@ -71,7 +71,7 @@ long getNumElements(char* code) {
 }
 
 template <class T>
-bool verify(std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
+bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
 
   // Find out my identity in the default communicator 
   int myrank, p;
@@ -223,6 +223,7 @@ double time_sort(size_t N, MPI_Comm comm){
   std::vector<T> in_cpy=in;
   std::vector<T> out;
 
+	/*
 	unsigned int kway = 7;
 	DendroIntL Nglobal=p*N;
 	
@@ -235,16 +236,21 @@ double time_sort(size_t N, MPI_Comm comm){
 		K[i] = (Nglobal*(i+1))/(kway+1);
 	}
 	
-	std::sort(in.begin(), in.end());
-	
-	double tselect =- omp_get_wtime();
-	std::vector<T> guess = par::GuessRangeMedian<T>(in, min_idx, max_idx, comm);
-	std::vector<T> slct = par::Sorted_k_Select<T>(in, min_idx, max_idx, K, guess, comm);
-	tselect += omp_get_wtime();
+	std::sort(in.begin(), in.end());	
 	
 	double pselect =- omp_get_wtime();
 	std::vector<T> pslct = par::Sorted_approx_Select(in, kway, comm);
 	pselect += omp_get_wtime();
+	
+	if (!myrank) std::cout << "Sample Select" << std::endl;
+	par::rankSamples(in, pslct, comm);
+	
+	if (!myrank) std::cout << "Quick Select" << std::endl;
+	double tselect =- omp_get_wtime();
+	std::vector<T> guess = par::GuessRangeMedian<T>(in, min_idx, max_idx, comm);
+	std::vector<T> slct = par::Sorted_k_Select<T>(in, min_idx, max_idx, K, guess, comm);
+	tselect += omp_get_wtime();
+
 	
 	if (!myrank) {
 		for(size_t i = 0; i < kway; ++i)
@@ -253,10 +259,10 @@ double time_sort(size_t N, MPI_Comm comm){
 		}
 		std::cout << "times: " << tselect << " " << pselect << std::endl;
 	}
-	
-	
-	return 0.0;
 
+	return 0.0;
+	*/
+	
   // Warmup run and verification.
   SORT_FUNCTION<T>(in, out, comm);
   in=in_cpy;
@@ -353,9 +359,9 @@ int main(int argc, char **argv){
       tt[100*k+0]=ttt;
     }
   }
-	MPI_Finalize();
-	return 0;
-  { // smaller /2^k runs 
+	// MPI_Finalize();
+  // return 0;m,
+	{ // smaller /2^k runs 
     int myrank_;
     MPI_Comm_rank(comm, &myrank_);
     double ttt;

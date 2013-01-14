@@ -390,6 +390,9 @@ namespace par {
     int concatenate(std::vector<T> & listA,
         std::vector<T> & listB, MPI_Comm comm);
 
+		template<typename T>
+		void rankSamples(std::vector<T>& arr, std::vector<T> samples, MPI_Comm comm);
+
 	template<typename T>
 		std::vector<T> Sorted_approx_Select(std::vector<T>& arr, unsigned int k, MPI_Comm comm);
 	template<typename T>
