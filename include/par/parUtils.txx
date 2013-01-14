@@ -2089,7 +2089,7 @@ namespace par {
 
           DendroIntL* split_disp=&glb_disp[0];
           for(size_t i=0;i<glb_splt_count;i++)
-            if(abs(glb_disp[i]-totSize/2)<abs(*split_disp-totSize/2)) split_disp=&glb_disp[i];
+            if( labs(glb_disp[i]-totSize/2) < labs(*split_disp-totSize/2)) split_disp=&glb_disp[i];
           split_key=glb_splitters[split_disp-&glb_disp[0]];
 
           totSize_new=(myrank<=(npes-1)/2?*split_disp:totSize-*split_disp);
@@ -2197,8 +2197,6 @@ namespace par {
       int omp_p=omp_get_max_threads();
       srand(myrank);
 
-			int range[2]={0,npes};
-
       // Local and global sizes. O(log p)
       DendroIntL totSize, nelem = arr.size(); assert(nelem);
       par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
@@ -2236,14 +2234,19 @@ namespace par {
 				2. send recv with kway-1 partners - asynchronous 
 				3. merge received buffers 
 				*/
-				unsigned int my_chunk = myrank / (npes/kway);
 				unsigned int overhang = npes%kway;
 				size_t new_np[kway], new_p0[kway]; 
 				for(size_t q = 0; q < kway; ++q) new_np[q] = (q < overhang)?(npes/kway + 1):(npes/kway);
-				new_p0[0] = 0; for(size_t q = 1; q < kway; ++q) new_p0[q] = new_p0[q-1] + new_np[q-1];
-				int new_pid = myrank - new_p0[my_chunk];
+				unsigned int my_chunk=kway-1;
+				new_p0[0] = 0; 
+				for(size_t q = 1; q < kway; ++q) {
+					new_p0[q] = new_p0[q-1] + new_np[q-1];
+					if ( (myrank >= new_p0[q-1]) && (myrank < new_p0[q] ) ) my_chunk = q-1;
+				}
 				
-				/*
+				int new_pid = myrank - new_p0[my_chunk];
+
+#ifdef _DEBUG_				
 				if (!myrank) {
 					std::cout << "new p0,np" << std::endl;
 					for(size_t i = 0; i < kway; ++i)
@@ -2251,8 +2254,7 @@ namespace par {
 						std::cout << "\t" << new_p0[i] << ", " << new_np[i] << std::endl;
 					}
 				}
-				*/
-				
+#endif				
 				// create lbuff from arr_ in my_chunk
 				std::vector<T> lbuff, lbuff_tmp;					
 				if (nelem > 0) {
@@ -2280,11 +2282,11 @@ namespace par {
 				for(size_t q = 0; q < kway; ++q) 
 				{	
 					if (my_chunk == q) continue; // skip self
-					int partner = (new_pid < new_np[q]? new_p0[q] + new_pid: new_np[q]-1) ;
-					bool have_extra = overhang && (q >= overhang) && ((new_p0[q]+new_np[q]-1) == myrank );
+					int partner = ( new_pid < new_np[q]? new_p0[q] + new_pid: new_p0[q]+new_np[q]-1) ;
+					bool have_extra = overhang && (q < overhang) && ((new_p0[my_chunk]+new_np[my_chunk]-1) == myrank );
 					int extra_partner = ((kway-1) == q)?npes-1:new_p0[q+1]-1;
 	
-					// std::cout << myrank << " " <<  partner << " " << extra_partner << std::endl;
+					// std::cout << myrank << " npid:"  << new_pid << " partner:" << partner << " " << have_extra << " " << extra_partner << std::endl;
 					assert(myrank != partner);
 					assert(myrank != extra_partner);
 	
@@ -2323,14 +2325,16 @@ namespace par {
 				MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
 				requests.clear();
 				
+				// if (!myrank) std::cout << "sending actual data" << std::endl;
+				
 				// now send actual data ...
 				std::vector<T*> rbuff(rsize.size());
 				r_idx=0; 
 				for(size_t q = 0; q < kway; ++q) 
 				{
 					if (my_chunk == q) continue; // skip self
-					int partner = (new_pid < new_np[q]? new_p0[q]+new_pid: new_np[q]-1) ;
-					bool have_extra = overhang && (q >= overhang) && ((new_p0[q]+new_np[q]-1) == myrank );
+					int partner = ( new_pid < new_np[q]? new_p0[q] + new_pid: new_p0[q]+new_np[q]-1) ;
+					bool have_extra = overhang && (q < overhang) && ((new_p0[my_chunk]+new_np[my_chunk]-1) == myrank );
 					int extra_partner = ((kway-1) == q)?npes-1:new_p0[q+1]-1;
 	
 				  rbuff[r_idx] = (rsize[r_idx]>0? new T[rsize[r_idx]]: NULL);
@@ -2379,13 +2383,11 @@ namespace par {
 	 
         arr_.swap(lbuff); lbuff.clear();
 				
-				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
+				// std::cout << myrank << " " << nelem << " " << totSize << std::endl;
 				nelem = arr_.size();
 				par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
-				// update range and totsize ...
-				// range[1]-range[0]>1 && totSize>0
-				
+				MPI_Barrier(comm);
         {// Split comm. kway  O( log(p) ) ??
           MPI_Comm scomm;
           MPI_Comm_split(comm, my_chunk, myrank, &scomm );
@@ -2394,7 +2396,7 @@ namespace par {
 		      MPI_Comm_rank(comm, &myrank);
         }				
       }
-
+			
 			SortedElem.swap(arr_);
       // SortedElem.resize(nelem);
       // SortedElem.assign(arr_, &arr_[nelem]);
