@@ -2215,12 +2215,40 @@ namespace par {
 			  if(kway>npes) 
 		      kway = npes; 
 				
-				std::vector<T> split_key = par::Sorted_approx_Select(arr_, kway-1, comm); // select kway-1 splitters 
+				// std::vector<T> split_key = par::Sorted_approx_Select(arr_, kway-1, comm); // select kway-1 splitters 
+				std::vector<unsigned int> min_idx, max_idx;
+				std::vector<DendroIntL> splitter_ranks;
+				
+				std::vector<T> guess = par::Sorted_Sample_Select(arr_, kway-1, min_idx, max_idx, splitter_ranks, comm);
+#ifdef _DEBUG_				
+				if (!myrank) 
+				{
+					std::cout << "kway = " << kway << std::endl;
+					std::cout << "guess: ";
+					for(size_t i = 0; i < guess.size(); ++i)
+					{
+						std::cout << guess[i] << " " ;
+					}
+					std::cout << std::endl << "ranks: ";
+					for(size_t i = 0; i < splitter_ranks.size(); ++i)
+					{
+						std::cout << splitter_ranks[i] << " " ;
+					}
+					std::cout << std::endl << "ranges: ";
+					for(size_t i = 0; i < splitter_ranks.size(); ++i)
+					{
+						std::cout << "[ " << min_idx[i] << ", " << max_idx[i] << " ]   ";
+					}
+					std::cout << std::endl;				
+				}
+#endif
+				std::vector<T> split_key = Sorted_k_Select(arr_, min_idx, max_idx, splitter_ranks, guess, comm); 	
 					
 #ifdef _DEBUG_			
 				if (!myrank) 
 				{
 					std::cout << "kway = " << kway << std::endl;
+					std::cout << "split keys size = " << split_key.size() << std::endl;
 					std::cout << "splitters: ";
 					for(size_t i = 0; i < kway-1; ++i)
 					{
@@ -2960,6 +2988,82 @@ namespace par {
 		} // GetRangeMean()
 		*/
 		
+		// ------------------------------
+
+	template<typename T>
+		std::vector<T> Sorted_Sample_Select(std::vector<T>& arr, unsigned int kway, std::vector<unsigned int>& min_idx, std::vector<unsigned int>& max_idx, std::vector<DendroIntL>& splitter_ranks, MPI_Comm comm) {
+			int rank, npes;
+      MPI_Comm_size(comm, &npes);
+			MPI_Comm_rank(comm, &rank);
+			
+			//-------------------------------------------
+      DendroIntL totSize, nelem = arr.size(); 
+      par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
+			
+			//Determine splitters. O( log(N/p) + log(p) )        
+      int splt_count = (kway*1000*nelem)/totSize; 
+      if (npes>1000) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?kway:0);
+      if (splt_count>nelem) splt_count=nelem;
+      std::vector<T> splitters(splt_count);
+      for(size_t i=0;i<splt_count;i++) 
+        splitters[i] = arr[rand()%nelem];
+
+      // Gather all splitters. O( log(p) )
+      int glb_splt_count;
+      std::vector<int> glb_splt_cnts(npes);
+      std::vector<int> glb_splt_disp(npes,0);
+      par::Mpi_Allgather<int>(&splt_count, &glb_splt_cnts[0], 1, comm);
+      omp_par::scan(&glb_splt_cnts[0],&glb_splt_disp[0],npes);
+      glb_splt_count = glb_splt_cnts[npes-1] + glb_splt_disp[npes-1];
+      std::vector<T> glb_splitters(glb_splt_count);
+      MPI_Allgatherv(&    splitters[0], splt_count, par::Mpi_datatype<T>::value(), 
+                     &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
+                     par::Mpi_datatype<T>::value(), comm);
+
+      // rank splitters. O( log(N/p) + log(p) )
+      std::vector<DendroIntL> disp(glb_splt_count,0);
+      if(nelem>0){
+        #pragma omp parallel for
+        for(size_t i=0; i<glb_splt_count; i++){
+          disp[i] = std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
+        }
+      }
+      std::vector<DendroIntL> glb_disp(glb_splt_count, 0);
+      MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
+        
+			splitter_ranks.clear(); splitter_ranks.resize(kway);	
+			min_idx.clear(); min_idx.resize(kway);
+			max_idx.clear(); max_idx.resize(kway);	
+	    std::vector<T> split_keys(kway);
+			#pragma omp parallel for
+      for (unsigned int qq=0; qq<kway; qq++) {
+				DendroIntL* _disp = &glb_disp[0];
+				DendroIntL* _mind = &glb_disp[0];
+				DendroIntL* _maxd = &glb_disp[0];
+				DendroIntL optSplitter = ((qq+1)*totSize)/(kway+1);
+        // if (!rank) std::cout << "opt " << qq << " - " << optSplitter << std::endl;
+        for(size_t i=0; i<glb_splt_count; i++) {
+        	if(labs(glb_disp[i] - optSplitter) < labs(*_disp - optSplitter)) {
+						_disp = &glb_disp[i];
+					}
+        	if( (glb_disp[i] > optSplitter) && ( labs(glb_disp[i] - optSplitter) < labs(*_maxd - optSplitter))  ) {
+						_maxd = &glb_disp[i];
+					}
+        	if( (glb_disp[i] < optSplitter) && ( labs(optSplitter - glb_disp[i]) < labs(optSplitter - *_mind))  ) {
+						_mind = &glb_disp[i];
+					}
+				}
+        split_keys[qq] = glb_splitters[_disp - &glb_disp[0]];
+				min_idx[qq] = std::lower_bound(&arr[0], &arr[nelem], glb_splitters[_mind - &glb_disp[0]]) - &arr[0];
+				max_idx[qq] = std::upper_bound(&arr[0], &arr[nelem], glb_splitters[_maxd - &glb_disp[0]]) - &arr[0];
+				splitter_ranks[qq] = optSplitter - *_mind;
+			}
+			
+			return split_keys;
+		}	
+	
+
+		
 	template<typename T>
 		std::vector<T> Sorted_approx_Select(std::vector<T>& arr, unsigned int kway, MPI_Comm comm) {
 			int rank, npes;
@@ -2989,15 +3093,6 @@ namespace par {
       MPI_Allgatherv(&    splitters[0], splt_count, par::Mpi_datatype<T>::value(), 
                      &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
                      par::Mpi_datatype<T>::value(), comm);
-
-      /*
-      if (!rank) {
-        std::cout << "global splitters ";
-        for (int i=0; i<glb_splt_count; ++i)
-          std::cout << glb_splitters[i] << " ";
-        std::cout << std::endl << std::endl;
-      }
-      */
 
       // rank splitters. O( log(N/p) + log(p) )
       std::vector<DendroIntL> disp(glb_splt_count,0);
@@ -3044,10 +3139,8 @@ namespace par {
 			} in[q], out[q];
 			
 			for(size_t i = 0; i < q; ++i) {
-				
-					in[i].r = range_max[i] - range_min[i];
+					in[i].r = rand(); // range_max[i] - range_min[i];
 					in[i].g = arr[(range_min[i] + range_max[i])/2];
-				
 			}
 			MPI_Allreduce( in, out, q, par::Mpi_pairtype<int, T>::value(), MPI_MAXLOC, comm );
 			for(size_t i = 0; i < q; ++i) {
@@ -3111,7 +3204,7 @@ namespace par {
 					DendroIntL optSplitter = ((i+1)*totSize)/(q+1);
 					double err_low = (optSplitter - global_lesser[i]); err_low = err_low/totSize; err_low = fabs(err_low*100);
 					double err_high = (optSplitter - global_less_or_equal[i]); err_high = err_high/totSize; err_high = fabs(err_high*100);
-					std::cout << "[ " << err_low << " ]  ";
+					std::cout << "[ " << err_low <<  " ]  ";
 				}
 				std::cout << std::endl;
 			}	
@@ -3153,10 +3246,9 @@ namespace par {
 
 			
 			while (selects.size() != splitter_ranks.size()) {
-				/*
-				if (guess.size() == splitter_ranks.size())
-					par::rankSamples(arr, guess, comm);
-					*/
+				// if (guess.size() == splitter_ranks.size())
+				// par::rankSamples(arr, guess, comm);
+			
 				q = K.size();
 				for(size_t i = 0; i < q; ++i) {
 					n[i] = max_idx[i] - min_idx[i];
@@ -3191,12 +3283,14 @@ namespace par {
 					else
 					{
 						if ( global_less_or_equal[i] < K[i] ) {
-							newMin.push_back(min_idx[i] + nloc_less_or_equal[i]); // wrong need local values 
+							// if (!rank) std::cout << "lesser: " << global_less_or_equal[i] << " " << K[i] << std::endl;							
+							newMin.push_back(min_idx[i] + nloc_less_or_equal[i] ); 
 							newMax.push_back(max_idx[i]); 
 							newK.push_back(K[i] - global_less_or_equal[i]);
 						} else if ( K[i] < global_lesser[i] ) {
+							// if (!rank) std::cout << "greater" << std::endl;
 							newMin.push_back(min_idx[i]); 
-							newMax.push_back(min_idx[i] + nloc_lesser[i]); // wrong need local values
+							newMax.push_back(min_idx[i] + nloc_lesser[i]); 
 							newK.push_back(K[i]);	
 						}		
 					}   
