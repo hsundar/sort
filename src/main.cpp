@@ -18,7 +18,7 @@
 #define SORT_FUNCTION par::HyperQuickSort_kway
 
 // #define SORT_FUNCTION par::sampleSort
-#define __VERIFY__
+// #define __VERIFY__
 
 long getNumElements(char* code) {
   unsigned int slen = strlen(code);

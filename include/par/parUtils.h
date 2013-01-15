@@ -390,6 +390,12 @@ namespace par {
     int concatenate(std::vector<T> & listA,
         std::vector<T> & listB, MPI_Comm comm);
 
+
+
+		// Move following functions to parSelect.{h,txx}
+		template<typename T>
+		int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz);
+
 		template<typename T>
 		void rankSamples(std::vector<T>& arr, std::vector<T> samples, MPI_Comm comm);
 
@@ -413,7 +419,22 @@ namespace par {
 		**/
 		template<typename T>
 				std::vector<T> Sorted_k_Select(std::vector<T>& arr, std::vector<unsigned int> min_idx, std::vector<unsigned int> max_idx, std::vector<DendroIntL> K, std::vector<T> guess, MPI_Comm comm);
+	
+			/** @brief adjusts communication patterns to achieve load balance at the receiving end. 
 			
+				Adjusts communication patterns to achieve load balance at the receiving end. The send partners are changed. 
+				The function also returns the correct receive sizes and partners, so can be followed by actual data communication.
+				Note that send_buffers and send_sizes do not change.	
+				
+				@author Hari Sundar 
+				@date 2013-01-15
+				@param  input:   send_sizes[kway], send_partners[kway], comm
+				@param  output:  send_partners[kway], recv_partners[k'] and recv_size[k']  
+			**/
+		int	AdjustCommunicationPattern(std::vector<int>& send_sizes, std::vector<int>& send_partners,
+					 												 std::vector<int>& recv_sizes, std::vector<int>& recv_partners, MPI_Comm comm) ;	
+				
+						
 		
 
   /**

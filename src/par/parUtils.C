@@ -279,6 +279,14 @@ namespace par {
     return 0;
   }//end function
 
+		
+	int AdjustCommunicationPattern(std::vector<int>& send_sizes, std::vector<int>& send_partners,
+				 												 std::vector<int>& recv_sizes, std::vector<int>& recv_partners, MPI_Comm comm) 
+	{
+		unsigned int k = send_sizes.size();
+		// 
+		return 1;
+	}
 
 }// end namespace
 

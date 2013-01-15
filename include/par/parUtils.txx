@@ -18,6 +18,7 @@
 #include "dendro.h"
 #include "ompUtils.h"
 #include "binUtils.h"
+
 #include <mpi.h>
 
 #ifdef __DEBUG__
@@ -2303,6 +2304,7 @@ namespace par {
 				int ssize[kway]; 
 				T* sbuff[kway];
 				
+				// loadBalance instead of following loop. 
 				std::vector<MPI_Request> requests; 
 				MPI_Request sRequests, rq;	
 				MPI_Status  statuses[2*(kway-1)]; // overallocate 
@@ -2352,6 +2354,17 @@ namespace par {
 				// no point overlapping here ...
 				MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
 				requests.clear();
+				
+				
+				
+				//============== Load-Balance here ================/
+				//
+				//  loadBalance:
+				//
+ 				//  input:   ssize[kway], s_partner[kway], comm
+				//  output:  r_partners[] and rsize[]  
+				//
+				//=================================================/
 				
 				// if (!myrank) std::cout << "sending actual data" << std::endl;
 				
@@ -2415,8 +2428,7 @@ namespace par {
 				nelem = arr_.size();
 				par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
-				MPI_Barrier(comm);
-        {// Split comm. kway  O( log(p) ) ??
+				{// Split comm. kway  O( log(p) ) ??
           MPI_Comm scomm;
           MPI_Comm_split(comm, my_chunk, myrank, &scomm );
           comm = scomm;
@@ -3132,26 +3144,27 @@ namespace par {
 			
 			unsigned int q = range_min.size();
 			
-			// v2, single random guess ...
-			struct {
-				int  r;
-				T    g; 
-			} in[q], out[q];
+			/*
+			par::RandomPick<T> in[q], out[q]; 
 			
 			for(size_t i = 0; i < q; ++i) {
-					in[i].r = rand(); // range_max[i] - range_min[i];
-					in[i].g = arr[(range_min[i] + range_max[i])/2];
+				in[i] = par::RandomPick<T>(rand(), arr[(range_min[i] + range_max[i])/2]);
 			}
-			MPI_Allreduce( in, out, q, par::Mpi_pairtype<int, T>::value(), MPI_MAXLOC, comm );
+			MPI_Allreduce( in, out, q, par::Mpi_datatype<RandomPick<T> >::value(), MPI_SUM, comm );
 			for(size_t i = 0; i < q; ++i) {
-				guess.push_back(out[i].g);
+				guess.push_back(out[i].data());
 			}
+			*/
 			
-			/* reduce to see which proc has max values
+			// reduce to pick a non-zero proc 
 			int in[2*q], out[2*q];
 			for(size_t i = 0; i < q; ++i) {
-					in[2*i] = range_max[i] - range_min[i];
-					in[2*i + 1] = rank; 
+				if (range_max[i] - range_min[i]) {
+					in[2*i] = rand();
+				} else {
+					in[2*i] = 0;	
+				}
+				in[2*i + 1] = rank; 
 			}
 			MPI_Allreduce( in, out, q, par::Mpi_pairtype<int, int>::value(), MPI_MAXLOC, comm );
 			
@@ -3163,9 +3176,7 @@ namespace par {
 				}
 				par::Mpi_Bcast<T>(&val, 1, out[2*i+1], comm);
 				guess.push_back(val);
-				// if (!rank) std::cout << val << " ";
 			}
-			*/
 			return guess;
 		}
 		
@@ -3304,7 +3315,58 @@ namespace par {
 			return selects;			
 		
 		} // end function - kSelect
+
+		template<typename T>
+		int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz) 
+		{
+			int rank, npes;
+			MPI_Comm_size(comm, &npes);
+			MPI_Comm_rank(comm, &rank);
+			MPI_Request request;
+			MPI_Status status;			
+						
+			// 1.  Compute optimal load partition ...
+      int narr = a_sz.size();
+			DendroIntL totSize, nelem = 0; 
+      for(size_t i = 0; i < narr; ++i)
+				nelem += a_sz[i];
+      par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
+			
+			DendroIntL N_opt = totSize/npes;   // desired partition ...
+			
+			
+      // 2. perform a scan on the weights
+      DendroIntL lscn[narr];
+			DendroIntL zero = 0, off1, off2;
+      if(narr) {
+        lscn[0] = a_sz[0];
+        omp_par::scan(&(a_sz[1]), lscn, narr);
+        // now scan with the final members of 
+        par::Mpi_Scan<DendroIntL>(lscn + narr-1, &off1, 1, MPI_SUM, comm ); 
+      } else{
+        par::Mpi_Scan<DendroIntL>(&zero, &off1, 1, MPI_SUM, comm ); 
+      }
+
+      // communicate the offsets ...
+      if (rank < (npes-1)){
+        par::Mpi_Issend<DendroIntL>( &off1, 1, rank+1, 0, comm, &request );
+      }
+      if (rank){
+        par::Mpi_Recv<DendroIntL>( &off2, 1, rank-1, 0, comm, &status );
+      }
+      else{
+        off2 = 0; 
+      }
+
+      // add offset to local array
+      #pragma omp parallel for
+      for (DendroIntL i = 0; i < narr; i++) {
+        lscn[i] = lscn[i] + off2;       // This has the global scan results now ...
+      }//end for
 		
+			// figure out to whom the subarray belongs ...
+		
+		}
 
 }//end namespace
 
