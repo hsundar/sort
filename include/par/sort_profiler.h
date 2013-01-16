@@ -33,7 +33,8 @@ extern sort_profiler_t 				sample_do_all2all;
 extern sort_profiler_t				hyper_compute_splitters;
 extern sort_profiler_t				hyper_communicate;
 extern sort_profiler_t				hyper_merge;
-
+extern sort_profiler_t 				hyper_comm_split;
+	
 extern sort_profiler_t 				seq_sort;
 extern sort_profiler_t				sort_partitionw;
 

@@ -34,15 +34,17 @@
 
 // #define __VERIFY__
 
+void printResults(int num_threads, MPI_Comm comm);
+
 void getStats(double val, double *meanV, double *minV, double *maxV, MPI_Comm comm) 
 { 
 	int p; 
 	double d, din;
 	din = val;
   MPI_Comm_size(comm, &p);
-	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); *meanV = d/p;
-	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD); *minV = d;
-	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); *maxV = d;
+	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_SUM, 0, comm); *meanV = d/p;
+	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MIN, 0, comm); *minV = d;
+	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MAX, 0, comm); *maxV = d;
 }
 
 long getNumElements(char* code) {
@@ -168,6 +170,22 @@ double time_sort_bench(size_t N, MPI_Comm comm) {
   verify(in,out,comm);
 #endif
   
+#ifdef _PROFILE_SORT
+	total_sort.clear();
+	
+	seq_sort.clear();
+	sort_partitionw.clear();
+	
+	sample_get_splitters.clear();
+	sample_sort_splitters.clear();
+	sample_prepare_scatter.clear();
+	sample_do_all2all.clear();
+	
+	hyper_compute_splitters.clear();
+	hyper_communicate.clear();
+	hyper_merge.clear();
+#endif
+		
   //Sort
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
@@ -211,6 +229,22 @@ double time_sort_tn(size_t N, MPI_Comm comm) {
   // SORT_FUNCTION<Data_t>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
+#endif
+
+#ifdef _PROFILE_SORT
+	total_sort.clear();
+	
+	seq_sort.clear();
+	sort_partitionw.clear();
+	
+	sample_get_splitters.clear();
+	sample_sort_splitters.clear();
+	sample_prepare_scatter.clear();
+	sample_do_all2all.clear();
+	
+	hyper_compute_splitters.clear();
+	hyper_communicate.clear();
+	hyper_merge.clear();
 #endif
   
   //Sort
@@ -340,7 +374,8 @@ int main(int argc, char **argv){
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
 
   //Set number of OpenMP threads to use.
-  omp_set_num_threads(atoi(argv[1]));
+  int num_threads = atoi(argv[1]);
+	omp_set_num_threads(num_threads);
 
   // Initialize MPI
   MPI_Init(&argc, &argv);
@@ -356,7 +391,7 @@ int main(int argc, char **argv){
   int proc_group=0;
   int min_np=1;
   MPI_Comm comm;
-  for(int i=p;myrank<i && i>=min_np ;i=i>>1) proc_group++;
+  for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
   MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
 
   std::vector<double> tt(10000,0);
@@ -397,35 +432,17 @@ int main(int argc, char **argv){
         ttt = time_sort_bench(N, MPI_COMM_WORLD);
         break;
     };
-#ifdef _PROFILE_SORT
-		// reduce results
-		double t, meanV, minV, maxV;
+#ifdef _PROFILE_SORT 			
 		if (!myrank) {
-			std::cout << " for " << N*p << " entries on " << p << " tasks : " << argv[1] << " threads" << std::endl;
-			std::cout << "===================================================================" << std::endl;
-			t = total_sort.seconds; 			getStats(t, &meanV, &minV, &maxV, MPI_COMM_WORLD);
-			std::cout << "Total sort time   \t\t\t" << meanV << "\t[" << minV << ", " << maxV << "]"<< std::endl;
-			std::cout << "-------------------------------------------------------" << std::endl;
-			t = seq_sort.seconds; 				getStats(t, &meanV, &minV, &maxV, MPI_COMM_WORLD);
-			std::cout << "Sequential Sort   \t\t\t" << meanV << "\t[" << minV << ", " << maxV << "]"<< std::endl;
-			t = sort_partitionw.seconds; 	getStats(t, &meanV, &minV, &maxV, MPI_COMM_WORLD);
-			std::cout << "partitionW        \t\t\t" << meanV << "\t[" << minV << ", " << maxV << "]"<< std::endl; 
-			std::cout << "-------------------------------------------------------" << std::endl;
-#ifndef KWICK
-			std::cout << "Sample Sort with " << KWAY << "-way all2all" << std::endl;
-			std::cout << "-------------------------------------------------------" << std::endl; 			
-			std::cout << "sort splitters    \t\t\t" << sample_sort_splitters.seconds << std::endl;
-			std::cout << "prepare scatter   \t\t\t" << sample_prepare_scatter.seconds << std::endl;
-			std::cout << "all2all           \t\t\t" << sample_do_all2all.seconds << std::endl;			 
-#else			
-			std::cout << KWAY << "-way HyperQuickSort" << std::endl;
-			std::cout << "-------------------------------------------------------" << std::endl; 			
-			std::cout << "compute splitters \t\t\t" << hyper_compute_splitters.seconds << std::endl;
-			std::cout << "communicate       \t\t\t" << hyper_communicate.seconds << std::endl;
-			std::cout << "merge arrays      \t\t\t" << hyper_merge.seconds << std::endl;
-#endif			
-			std::cout << "=======================================================" << std::endl;			 
+			std::cout << "---------------------------------------------------------------------------" << std::endl;
+		#ifndef KWICK
+			std::cout << "\tSample Sort with " << KWAY << "-way all2all" << "\t\tMean\tMin\tMax" << std::endl;
+		#else
+			std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
+		#endif
+			std::cout << "---------------------------------------------------------------------------" << std::endl;
 		}
+		printResults(num_threads, MPI_COMM_WORLD);
 #endif
 		
     if(!myrank){
@@ -465,6 +482,21 @@ int main(int argc, char **argv){
     }
   }
 
+	int num_groups=0;
+	if (!myrank) num_groups = proc_group;
+	MPI_Bcast(&num_groups, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+	for(size_t i = 0; i < num_groups; ++i)
+	{
+		MPI_Barrier(MPI_COMM_WORLD);
+		if (proc_group == i) {
+			MPI_Barrier(comm);
+			printResults(num_threads, comm);
+			MPI_Barrier(comm);
+		}
+	}
+
+
   std::vector<double> tt_glb(10000);
   MPI_Reduce(&tt[0], &tt_glb[0], 10000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!myrank){
@@ -482,6 +514,69 @@ int main(int argc, char **argv){
   // Shut down MPI 
   MPI_Finalize();
   return 0;
+}
 
+void printResults(int num_threads, MPI_Comm comm) {
+	int myrank, p;
+	MPI_Comm_size(comm, &p);
+	MPI_Comm_rank(comm, &myrank);
+	
+		// reduce results
+		double t, meanV, minV, maxV;
+		if (!myrank) {
+			// std::cout << std::endl;
+			// std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
+			std::cout <<  p << " tasks : " << num_threads << " threads" << std::endl;
+			// std::cout << "===========================================================================" << std::endl;
+		}
+		t = total_sort.seconds; 			getStats(t, &meanV, &minV, &maxV, comm);
+		if (!myrank) {
+			std::cout << "Total sort time   \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl;
+			// std::cout << "----------------------------------------------------------------------" << std::endl;
+		}
+		t = seq_sort.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);
+		if (!myrank) {
+			std::cout << "Sequential Sort   \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl;
+		}
+		t = sort_partitionw.seconds; 	getStats(t, &meanV, &minV, &maxV, comm);
+		if (!myrank) {	
+			std::cout << "partitionW        \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+			// std::cout << "----------------------------------------------------------------------" << std::endl;
+		}
+#ifndef KWICK
+		t = sample_sort_splitters.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);
+		if (!myrank) {	
+			std::cout << "sort splitters    \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}
+		t = sample_prepare_scatter.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);
+		if (!myrank) {
+			std::cout << "prepare scatter   \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}
+		t = sample_do_all2all.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);	
+		if (!myrank) {
+			std::cout << "all2all           \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}			 
+#else
+		t = hyper_compute_splitters.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);		
+		if (!myrank) {	
+			std::cout << "compute splitters \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}
+		t = hyper_communicate.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);	
+		if (!myrank) {	
+			std::cout << "exchange data     \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}
+		t = hyper_merge.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);	
+		if (!myrank) {	
+			std::cout << "merge arrays      \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}
+		t = hyper_comm_split.seconds; 				getStats(t, &meanV, &minV, &maxV, comm);	
+		if (!myrank) {	
+			std::cout << "comm split        \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
+		}
+#endif
+		if (!myrank) {			
+			// std::cout << "---------------------------------------------------------------------------" << std::endl;
+			std::cout << "" << std::endl;
+		}			 
 }
 

@@ -2031,6 +2031,9 @@ namespace par {
       MPI_Barrier(comm);
 #endif
       PROF_SORT_BEGIN
+	#ifdef _PROFILE_SORT
+		 		total_sort.start();
+	#endif
 
       // Copy communicator.
       MPI_Comm comm=comm_;
@@ -2041,9 +2044,18 @@ namespace par {
       MPI_Comm_rank(comm, &myrank); myrank_=myrank;
       if(npes==1){
         // @dhairya isn't this wrong for the !sort-in-place case ... 
-        omp_par::merge_sort(&arr[0],&arr[arr.size()]);
-        SortedElem  = arr;
-        PROF_SORT_END
+#ifdef _PROFILE_SORT
+		 		seq_sort.start();
+#endif        
+				omp_par::merge_sort(&arr[0],&arr[arr.size()]);
+#ifdef _PROFILE_SORT
+		 		seq_sort.stop();
+#endif        
+				SortedElem  = arr;
+#ifdef _PROFILE_SORT
+		 		total_sort.stop();
+#endif        
+				PROF_SORT_END
       }
 
       int omp_p=omp_get_max_threads();
@@ -2055,13 +2067,21 @@ namespace par {
       DendroIntL nelem_ = nelem;
 
       // Local sort.
-      T* arr_=new T[nelem]; memcpy (&arr_[0], &arr[0], nelem*sizeof(T));
-      omp_par::merge_sort(&arr_[0], &arr_[arr.size()]);
-
+#ifdef _PROFILE_SORT
+		 	seq_sort.start();
+#endif			
+      T* arr_=new T[nelem]; memcpy (&arr_[0], &arr[0], nelem*sizeof(T));      
+			omp_par::merge_sort(&arr_[0], &arr_[arr.size()]);
+#ifdef _PROFILE_SORT
+		 	seq_sort.stop();
+#endif
       // Binary split and merge in each iteration.
       while(npes>1 && totSize>0){ // O(log p) iterations.
 
         //Determine splitters. O( log(N/p) + log(p) )
+#ifdef _PROFILE_SORT
+			 	hyper_compute_splitters.start();
+#endif				
         T split_key;
         DendroIntL totSize_new;
         //while(true)
@@ -2107,10 +2127,17 @@ namespace par {
           //if(fabs(err)<0.01 || npes<=16) break;
           //else if(!myrank) std::cout<<err<<'\n';
         }
-
+#ifdef _PROFILE_SORT
+			 	hyper_compute_splitters.stop();
+#endif
+			
         // Split problem into two. O( N/p )
         int split_id=(npes-1)/2;
         {
+#ifdef _PROFILE_SORT
+				 	hyper_communicate.start();
+#endif				
+					
           int new_p0=(myrank<=split_id?0:split_id+1);
           int cmp_p0=(myrank> split_id?0:split_id+1);
           int new_np=(myrank<=split_id? split_id+1: npes-split_id-1);
@@ -2141,7 +2168,10 @@ namespace par {
           char* ext_rbuff=(ext_rsize>0? new char[ext_rsize]: NULL);
           MPI_Sendrecv                  (sbuff,ssize,MPI_BYTE, partner,0,       rbuff,    rsize,MPI_BYTE, partner,   0,comm,&status);
           if(extra_partner) MPI_Sendrecv( NULL,    0,MPI_BYTE,split_id,0,   ext_rbuff,ext_rsize,MPI_BYTE,split_id,   0,comm,&status);
-
+#ifdef _PROFILE_SORT
+				 	hyper_communicate.stop();
+				 	hyper_merge.start();
+#endif
           int nbuff_size=lsize+rsize+ext_rsize;
           char* nbuff= new char[nbuff_size];
           omp_par::merge<T*>((T*)lbuff, (T*)&lbuff[lsize], (T*)rbuff, (T*)&rbuff[rsize], (T*)nbuff, omp_p, std::less<T>());
@@ -2160,6 +2190,11 @@ namespace par {
           //Free memory.
           if(    rbuff!=NULL) delete[]     rbuff;
           if(ext_rbuff!=NULL) delete[] ext_rbuff;
+#ifdef _PROFILE_SORT
+				 	hyper_merge.stop();
+					hyper_comm_split.start();
+#endif				
+					
         }
 
         {// Split comm.  O( log(p) ) ??
@@ -2169,14 +2204,26 @@ namespace par {
           npes  =(myrank<=split_id? split_id+1: npes  -split_id-1);
           myrank=(myrank<=split_id? myrank    : myrank-split_id-1);
         }
+#ifdef _PROFILE_SORT
+				hyper_comm_split.stop();
+#endif				
       }
 
       SortedElem.resize(nelem);
       SortedElem.assign(arr_, &arr_[nelem]);
       if(arr_!=NULL) delete[] arr_;
 
+#ifdef _PROFILE_SORT
+		 	sort_partitionw.start();
+#endif
       par::partitionW<T>(SortedElem, NULL , comm_);
+#ifdef _PROFILE_SORT
+		 	sort_partitionw.stop();
+#endif
 
+#ifdef _PROFILE_SORT
+		 	total_sort.stop();
+#endif
       PROF_SORT_END
     }//end function
 // */
@@ -2187,6 +2234,9 @@ namespace par {
       MPI_Barrier(comm);
 #endif
       PROF_SORT_BEGIN
+#ifdef _PROFILE_SORT
+		 	total_sort.start();
+#endif
 
 			unsigned int kway = KWAY;
       // Copy communicator.
@@ -2198,9 +2248,16 @@ namespace par {
       MPI_Comm_rank(comm, &myrank); 
       if(npes==1){
         // FIXME dhairya isn't this wrong for the !sort-in-place case ... 
+#ifdef _PROFILE_SORT
+		 		seq_sort.start();
+#endif
         omp_par::merge_sort(&arr[0], &arr[arr.size()]);
         SortedElem  = arr;
-        PROF_SORT_END
+#ifdef _PROFILE_SORT
+		 		seq_sort.stop();
+				total_sort.stop();
+#endif
+			  PROF_SORT_END
       }
 
 			// unsigned int logk = binOp::fastLog2(kway);
@@ -2215,16 +2272,23 @@ namespace par {
       // Local sort.
       std::vector<T> arr_(nelem); // =new T[nelem];
 			// T* arr_ = new T[nelem];
-			 
+#ifdef _PROFILE_SORT
+		 	seq_sort.start();
+#endif			 
 			memcpy (&arr_[0], &arr[0], nelem*sizeof(T));
       omp_par::merge_sort(&arr_[0], &arr_[arr.size()]);
-
+#ifdef _PROFILE_SORT
+		 	seq_sort.stop();
+#endif
       // while(npes>1 && totSize>0) {
 		  while(npes>1 && totSize>0){
 		  	// if (!myrank) std::cout << "========================================" << std::endl;
 			  if(kway>npes) 
 		      kway = npes; 
-				
+
+#ifdef _PROFILE_SORT
+			 	hyper_compute_splitters.start();
+#endif				
 				// std::vector<T> split_key = par::Sorted_approx_Select(arr_, kway-1, comm); // select kway-1 splitters 
 				std::vector<unsigned int> min_idx, max_idx;
 				std::vector<DendroIntL> splitter_ranks;
@@ -2267,6 +2331,11 @@ namespace par {
 					std::cout << std::endl;				
 				}
 #endif
+			
+#ifdef _PROFILE_SORT
+			 	hyper_compute_splitters.stop();
+				hyper_communicate.start();
+#endif			
 				/*
 				1. exchange send sizes - kway
 				2. send recv with kway-1 partners - asynchronous 
@@ -2408,6 +2477,10 @@ namespace par {
 				remaining = requests.size();
 				while(remaining) {
 				  MPI_Waitsome(requests.size(), &(*(requests.begin())), &count, index, statuses);
+	#ifdef _PROFILE_SORT
+					hyper_communicate.stop();
+				 	hyper_merge.start();
+	#endif
 					if (count > 0)
 					{
 						// if (!myrank) std::cout << "waitsome - processed " << count << std::endl;
@@ -2419,6 +2492,7 @@ namespace par {
 						  int nbuff_size = lbuff.size() + rsize[q];
 						  lbuff_tmp.resize(nbuff_size);
 							// if (!myrank) std::cout << "merging " << lbuff.size() << " + " << rsize[q] << std::endl;	
+			
 						  omp_par::merge<T*>(&(*(lbuff.begin())), &(*(lbuff.end())), rbuff[q], &(rbuff[q][rsize[q]]), &(*(lbuff_tmp.begin())), omp_p, std::less<T>());
 				      delete [] rbuff[q];
 							lbuff.swap(lbuff_tmp);
@@ -2427,8 +2501,15 @@ namespace par {
 				 		  // lbuff_tmp.clear();				 
 						}
 						remaining = remaining - count;
-					} else {remaining = 0; } 
+					} else {remaining = 0; }
+#ifdef _PROFILE_SORT
+				 	hyper_merge.stop();
+					hyper_communicate.start();
+#endif 
 				} // remaining 
+#ifdef _PROFILE_SORT
+				hyper_communicate.stop();
+#endif
 				requests.clear(); rsize.clear(); rbuff.clear();
 	 
         arr_.swap(lbuff); lbuff.clear();
@@ -2437,22 +2518,36 @@ namespace par {
 				nelem = arr_.size();
 				par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
+#ifdef _PROFILE_SORT
+				hyper_comm_split.start();
+#endif				
 				{// Split comm. kway  O( log(p) ) ??
           MPI_Comm scomm;
           MPI_Comm_split(comm, my_chunk, myrank, &scomm );
           comm = scomm;
 		      MPI_Comm_size(comm, &npes);
 		      MPI_Comm_rank(comm, &myrank);
-        }				
+        }
+#ifdef _PROFILE_SORT
+				hyper_comm_split.stop();
+#endif								
       }
 			
 			SortedElem.swap(arr_);
       // SortedElem.resize(nelem);
       // SortedElem.assign(arr_, &arr_[nelem]);
       // if(arr_!=NULL) delete[] arr_;
-
+#ifdef _PROFILE_SORT
+		 	sort_partitionw.start();
+#endif
       par::partitionW<T>(SortedElem, NULL , comm_);
+#ifdef _PROFILE_SORT
+		 	sort_partitionw.stop();
+#endif
 
+#ifdef _PROFILE_SORT
+		 	total_sort.stop();
+#endif
       PROF_SORT_END
     }//end function
 // */
@@ -3369,7 +3464,7 @@ namespace par {
 				max_idx = newMax;
 				K = newK;
 			} // while ...
-			if (!rank) std::cout << "kSelect took " << iters << " iterations. " << std::endl;
+			// if (!rank) std::cout << "kSelect took " << iters << " iterations. " << std::endl;
 			
 			std::sort(selects.begin(), selects.end());
 			return selects;			

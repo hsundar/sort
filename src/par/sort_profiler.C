@@ -16,6 +16,7 @@ sort_profiler_t 				sample_do_all2all;
 sort_profiler_t					hyper_compute_splitters;
 sort_profiler_t					hyper_communicate;
 sort_profiler_t					hyper_merge;
+sort_profiler_t 				hyper_comm_split;
 
 sort_profiler_t 				seq_sort;
 sort_profiler_t					sort_partitionw;
