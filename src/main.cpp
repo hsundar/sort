@@ -5,6 +5,11 @@
 #include <vector>
 #include <omp.h>
 #include <sstream>
+
+#ifdef _PROFILE_SORT
+#include "sort_profiler.h"
+#endif
+
 #include <binUtils.h>
 #include <ompUtils.h>
 #include <parUtils.h>
@@ -15,10 +20,30 @@
 #include <sortRecord.h>
 
 #define MAX_DEPTH 30
-#define SORT_FUNCTION par::HyperQuickSort_kway
 
-// #define SORT_FUNCTION par::sampleSort
+
+#ifdef KWICK
+	#if KWAY > 2
+		#define SORT_FUNCTION par::HyperQuickSort_kway
+	#else
+	 	#define SORT_FUNCTION par::HyperQuickSort
+	#endif
+#else
+	#define SORT_FUNCTION par::sampleSort
+#endif
+
 // #define __VERIFY__
+
+void getStats(double val, double *meanV, double *minV, double *maxV, MPI_Comm comm) 
+{ 
+	int p; 
+	double d, din;
+	din = val;
+  MPI_Comm_size(comm, &p);
+	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); *meanV = d/p;
+	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD); *minV = d;
+	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD); *maxV = d;
+}
 
 long getNumElements(char* code) {
   unsigned int slen = strlen(code);
@@ -271,6 +296,23 @@ double time_sort(size_t N, MPI_Comm comm){
   verify(in,out,comm);
 #endif
 
+#ifdef _PROFILE_SORT
+	total_sort.clear();
+	
+	seq_sort.clear();
+	sort_partitionw.clear();
+	
+	sample_get_splitters.clear();
+	sample_sort_splitters.clear();
+	sample_prepare_scatter.clear();
+	sample_do_all2all.clear();
+	
+	hyper_compute_splitters.clear();
+	hyper_communicate.clear();
+	hyper_merge.clear();
+#endif
+
+
   //Sort
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
@@ -355,6 +397,37 @@ int main(int argc, char **argv){
         ttt = time_sort_bench(N, MPI_COMM_WORLD);
         break;
     };
+#ifdef _PROFILE_SORT
+		// reduce results
+		double t, meanV, minV, maxV;
+		if (!myrank) {
+			std::cout << " for " << N*p << " entries on " << p << " tasks : " << argv[1] << " threads" << std::endl;
+			std::cout << "===================================================================" << std::endl;
+			t = total_sort.seconds; 			getStats(t, &meanV, &minV, &maxV, MPI_COMM_WORLD);
+			std::cout << "Total sort time   \t\t\t" << meanV << "\t[" << minV << ", " << maxV << "]"<< std::endl;
+			std::cout << "-------------------------------------------------------" << std::endl;
+			t = seq_sort.seconds; 				getStats(t, &meanV, &minV, &maxV, MPI_COMM_WORLD);
+			std::cout << "Sequential Sort   \t\t\t" << meanV << "\t[" << minV << ", " << maxV << "]"<< std::endl;
+			t = sort_partitionw.seconds; 	getStats(t, &meanV, &minV, &maxV, MPI_COMM_WORLD);
+			std::cout << "partitionW        \t\t\t" << meanV << "\t[" << minV << ", " << maxV << "]"<< std::endl; 
+			std::cout << "-------------------------------------------------------" << std::endl;
+#ifndef KWICK
+			std::cout << "Sample Sort with " << KWAY << "-way all2all" << std::endl;
+			std::cout << "-------------------------------------------------------" << std::endl; 			
+			std::cout << "sort splitters    \t\t\t" << sample_sort_splitters.seconds << std::endl;
+			std::cout << "prepare scatter   \t\t\t" << sample_prepare_scatter.seconds << std::endl;
+			std::cout << "all2all           \t\t\t" << sample_do_all2all.seconds << std::endl;			 
+#else			
+			std::cout << KWAY << "-way HyperQuickSort" << std::endl;
+			std::cout << "-------------------------------------------------------" << std::endl; 			
+			std::cout << "compute splitters \t\t\t" << hyper_compute_splitters.seconds << std::endl;
+			std::cout << "communicate       \t\t\t" << hyper_communicate.seconds << std::endl;
+			std::cout << "merge arrays      \t\t\t" << hyper_merge.seconds << std::endl;
+#endif			
+			std::cout << "=======================================================" << std::endl;			 
+		}
+#endif
+		
     if(!myrank){
       tt[100*k+0]=ttt;
     }

@@ -16,9 +16,13 @@
 #include <algorithm>
 #include <cstring>
 #include "dendro.h"
+
+#ifdef _PROFILE_SORT
+  #include "sort_profiler.h"
+#endif
+
 #include "ompUtils.h"
 #include "binUtils.h"
-
 #include <mpi.h>
 
 #ifdef __DEBUG__
@@ -26,6 +30,11 @@
 #define __DEBUG_PAR__
 #endif
 #endif
+
+#ifndef KWAY
+		#define KWAY 8
+#endif 
+
 
 namespace par {
 
@@ -378,7 +387,7 @@ namespace par {
         (sbuff_, s_cnt_, sdisp_,
          rbuff_, r_cnt_, rdisp_, c);
 #else
-  int kway=8;
+  int kway = KWAY;
   int np, pid;
   MPI_Comm_size(c, &np);
   MPI_Comm_rank(c, &pid);
@@ -2173,13 +2182,13 @@ namespace par {
 // */
 
   template<typename T>
-    int HyperQuickSort_kway(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_, unsigned int _kway) { // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
+    int HyperQuickSort_kway(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_) { // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
 #ifdef __PROFILE_WITH_BARRIER__
       MPI_Barrier(comm);
 #endif
       PROF_SORT_BEGIN
 
-			unsigned int kway = _kway;
+			unsigned int kway = KWAY;
       // Copy communicator.
       MPI_Comm comm=comm_;
 
@@ -2221,7 +2230,7 @@ namespace par {
 				std::vector<DendroIntL> splitter_ranks;
 				
 				std::vector<T> guess = par::Sorted_Sample_Select(arr_, kway-1, min_idx, max_idx, splitter_ranks, comm);
-#ifdef _DEBUG_				
+#ifdef __DEBUG_PAR__				
 				if (!myrank) 
 				{
 					std::cout << "kway = " << kway << std::endl;
@@ -2245,7 +2254,7 @@ namespace par {
 #endif
 				std::vector<T> split_key = Sorted_k_Select(arr_, min_idx, max_idx, splitter_ranks, guess, comm); 	
 					
-#ifdef _DEBUG_			
+#ifdef __DEBUG_PAR__			
 				if (!myrank) 
 				{
 					std::cout << "kway = " << kway << std::endl;
@@ -2275,7 +2284,7 @@ namespace par {
 				
 				int new_pid = myrank - new_p0[my_chunk];
 
-#ifdef _DEBUG_				
+#ifdef __DEBUG_PAR__				
 				if (!myrank) {
 					std::cout << "new p0,np" << std::endl;
 					for(size_t i = 0; i < kway; ++i)
@@ -2456,19 +2465,29 @@ namespace par {
 #endif
       PROF_SORT_BEGIN
 
-        int npes;
+#ifdef _PROFILE_SORT
+	 		total_sort.start();
+#endif
+
+     int npes;
 
       MPI_Comm_size(comm, &npes);
 
       assert(arr.size());
 
       if (npes == 1) {
-
-        // std::cout <<" have to use seq. sort" <<" since npes = 1 . inpSize: "<<(arr.size()) <<std::endl;
-//        std::sort(arr.begin(), arr.end());
+#ifdef _PROFILE_SORT
+				seq_sort.start();
+#endif
         omp_par::merge_sort(&arr[0],&arr[arr.size()]);
-        SortedElem  = arr;
-        PROF_SORT_END
+#ifdef _PROFILE_SORT
+  			seq_sort.stop();
+#endif        
+				SortedElem  = arr;
+#ifdef _PROFILE_SORT
+		 		total_sort.stop();
+#endif      
+			  PROF_SORT_END
       } 
 
       std::vector<T>  splitters;
@@ -2542,13 +2561,23 @@ namespace par {
 #endif
 
       //Re-part arr so that each proc. has atleast p elements.
-      par::partitionW<T>(arr, NULL, comm);
-
+#ifdef _PROFILE_SORT
+  		sort_partitionw.start();
+#endif
+			par::partitionW<T>(arr, NULL, comm);
+#ifdef _PROFILE_SORT
+  		sort_partitionw.stop();
+#endif
       nelem = arr.size();
 
-//      std::sort(arr.begin(),arr.end());
+#ifdef _PROFILE_SORT
+			seq_sort.start();
+#endif
       omp_par::merge_sort(&arr[0],&arr[arr.size()]);
-
+#ifdef _PROFILE_SORT
+			seq_sort.stop();
+#endif
+				
       std::vector<T> sendSplits(npes-1);
       splitters.resize(npes);
 
@@ -2557,9 +2586,19 @@ namespace par {
         sendSplits[i-1] = arr[i*nelem/npes];        
       }//end for i
 
+#ifdef _PROFILE_SORT
+ 		  sample_sort_splitters.start();
+#endif
       // sort sendSplits using bitonic ...
       par::bitonicSort<T>(sendSplits,comm);
-
+#ifdef _PROFILE_SORT
+ 		  sample_sort_splitters.stop();
+#endif
+				
+				
+#ifdef _PROFILE_SORT
+	 		sample_prepare_scatter.start();
+#endif				
       // All gather with last element of splitters.
       T* sendSplitsPtr = NULL;
       T* splittersPtr = NULL;
@@ -2680,9 +2719,18 @@ namespace par {
       if(!SortedElem.empty()) {
         SortedElemPtr = &(*(SortedElem.begin()));
       }
+#ifdef _PROFILE_SORT
+	 		sample_prepare_scatter.stop();
+#endif
+				
+#ifdef _PROFILE_SORT
+	 		sample_do_all2all.start();
+#endif							
       par::Mpi_Alltoallv_dense<T>(arrPtr, sendcnts, sdispls,
           SortedElemPtr, recvcnts, rdispls, comm);
-
+#ifdef _PROFILE_SORT
+	 		sample_do_all2all.stop();
+#endif							
       arr.clear();
 
       delete [] sendcnts;
@@ -2697,9 +2745,18 @@ namespace par {
       delete [] rdispls;
       rdispls = NULL;
 
-//      sort(SortedElem.begin(), SortedElem.end());
+#ifdef _PROFILE_SORT
+	 		seq_sort.start();
+#endif
       omp_par::merge_sort(&SortedElem[0], &SortedElem[nsorted]);
+#ifdef _PROFILE_SORT
+	 		seq_sort.stop();
+#endif
 
+
+#ifdef _PROFILE_SORT
+	 		total_sort.stop();
+#endif
       PROF_SORT_END
     }//end function
 
@@ -3229,7 +3286,7 @@ namespace par {
 			
 			unsigned int q = splitter_ranks.size();  // number of samples ...
 			
-#ifdef _DEBUG_
+#ifdef __DEBUG_PAR__
 			if (!rank) {
 			std::cout << q << ": guesses: \t";
 			for(size_t i = 0; i < q; ++i) {
@@ -3255,8 +3312,9 @@ namespace par {
 			min_idx = range_min;
 			max_idx = range_max;
 
-			
-			while (selects.size() != splitter_ranks.size()) {
+			unsigned int iters=0;
+			while ( selects.size() != splitter_ranks.size() ) {
+				iters++;
 				// if (guess.size() == splitter_ranks.size())
 				// par::rankSamples(arr, guess, comm);
 			
@@ -3286,10 +3344,10 @@ namespace par {
 				newMin.clear(); newMax.clear(); newK.clear();
 				// 3. see if converged, else recurse
 				for(size_t i = 0; i < q; ++i) {
-					if ( (global_lesser[i] <= K[i]) && (K[i] <= global_less_or_equal[i]) ) 
+					if ( ( (global_lesser[i] <= K[i]) && (K[i] <= global_less_or_equal[i]) ) || (!global_lesser[i]) || (global_lesser[i] == N[i]) ) 
 					{ // this one has converged ...
 						selects.push_back(guess[i]);
-						// std::cout << i << ": Selected split " << guess[i] << " of rank " << K[i] << std::endl;
+						// if (!rank) std::cout << i << ": Selected split " << guess[i] << " of rank " << K[i] << std::endl;
 					} 
 					else
 					{
@@ -3311,6 +3369,8 @@ namespace par {
 				max_idx = newMax;
 				K = newK;
 			} // while ...
+			if (!rank) std::cout << "kSelect took " << iters << " iterations. " << std::endl;
+			
 			std::sort(selects.begin(), selects.end());
 			return selects;			
 		

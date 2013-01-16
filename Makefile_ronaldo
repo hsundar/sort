@@ -9,13 +9,13 @@ LIBDIR=./lib
 BINDIR=./bin
 TMPDIR=./tmp
 
-CXXFLAGS= -O2 -fopenmp -msse4 $(INCDIR) -D__USE_64_BIT_INT__ -DALLTOALLV_FIX #-D USE_OLD_SORT
+CXXFLAGS= -O2 -fopenmp -msse4 $(INCDIR) -D__USE_64_BIT_INT__ -DALLTOALLV_FIX -DKWAY=8 -DKWICK#-D USE_OLD_SORT
 LFLAGS= -r
 LIBS=
 
 
 CCFILES=main.cpp
-CFILES=par/parUtils.C binOps/binUtils.C oct/TreeNode.C gensort/gensort.C gensort/rand16.C
+CFILES=par/parUtils.C par/sort_profiler.C binOps/binUtils.C oct/TreeNode.C gensort/gensort.C gensort/rand16.C
 
 OBJS=$(CCFILES:%.cpp=$(OBJDIR)/%.o) \
      $(CFILES:%.C=$(OBJDIR)/%.o)

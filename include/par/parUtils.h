@@ -448,7 +448,7 @@ namespace par {
     int HyperQuickSort(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 
   template<typename T>
-    int HyperQuickSort_kway(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm, unsigned int kway=8); 
+    int HyperQuickSort_kway(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 		
   /* mem-efficient version */
   template<typename T>
