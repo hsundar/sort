@@ -105,6 +105,8 @@ bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
   MPI_Comm_rank(comm, &myrank);
   MPI_Comm_size(comm,&p);
 
+  if (!myrank) std::cout << "Verifying sort" << std::endl;
+
   std::vector<T> in;
   {
     int N_local=in_.size()*sizeof(T);
@@ -156,14 +158,26 @@ double time_sort_bench(size_t N, MPI_Comm comm) {
   MPI_Comm_size(comm,&p);
 
   typedef sortRecord Data_t;
-  std::vector<Data_t> in(N);
-  genRecords((char* )&(*(in.begin())), myrank, N);
+  // if (!myrank) std::cout << "allocating for records" << std::endl;
+  std::vector<Data_t> in;
+  // if (!myrank) std::cout << "creating records" << std::endl;
+  // genRecords((char* )&(*(in.begin())), myrank, N);
+  for (int i=0; i<N; i++) {
+    in.push_back(sortRecord::random());
+  }
   
-  std::vector<Data_t> in_cpy=in;
+
+  // if (!myrank) std::cout << "created records" << std::endl;
+
+  std::vector<Data_t> in_cpy(N);
+  std::copy(in.begin(), in.end(), in_cpy.begin());
   std::vector<Data_t> out;
 
+
+  // if (!myrank) std::cout << "warmup sort" << std::endl;
   // Warmup run and verification.
   SORT_FUNCTION<Data_t>(in, out, comm);
+  // if (!myrank) std::cout << "finished warmup sort" << std::endl;
   // SORT_FUNCTION<Data_t>(in_cpy, comm);
   in=in_cpy;
 #ifdef __VERIFY__
@@ -500,11 +514,11 @@ int main(int argc, char **argv){
   std::vector<double> tt_glb(10000);
   MPI_Reduce(&tt[0], &tt_glb[0], 10000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!myrank){
-    std::cout<<"\nNew Sort:\n";
+    std::cout<<"\nSort - Weak Scaling:\n";
     for(int i=0;i<proc_group;i++){
       int np=p;
       if(i>0) np=(p>>(i-1))-(p>>i);
-      std::cout<<"\tP="<<np<<' ';
+      std::cout<<"\t\t\tP = "<<np<<"\t\t";
       // for(int k=0;k<=log_N;k++)
         std::cout<<tt_glb[100*k+i]<<' ';
       std::cout<<'\n';
