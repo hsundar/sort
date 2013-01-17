@@ -9,7 +9,8 @@ LIBDIR=./lib
 BINDIR=./bin
 TMPDIR=./tmp
 
-CXXFLAGS= -O3 -xHost -ipo -openmp $(INCDIR) -D__USE_64_BIT_INT__ -DALLTOALLV_FIX -DHAVE_PAPI -D_PROFILE_SORT -DKWAY=8 -DKWICK#-D USE_OLD_SORT
+KWAY=8
+CXXFLAGS= -O3 -xHost -ipo -openmp $(INCDIR) -D__USE_64_BIT_INT__ -DALLTOALLV_FIX -DHAVE_PAPI -D_PROFILE_SORT -DKWAY=$(KWAY) # -DKWICK -D USE_OLD_SORT
 LFLAGS= -r
 LIBS=
 
@@ -24,6 +25,17 @@ TARGET=$(BINDIR)/main
 
 all : $(TARGET) 
 
+hyper : CXXFLAGS += -DKWICK
+sample : $(OBJS)
+	-@$(MKDIRS) $(dir $@)
+	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@$(KWAY)
+hyper : $(OBJS)
+	-@$(MKDIRS) $(dir $@)
+	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@$(KWAY)
+
+sample : $(OBJS)
+	-@$(MKDIRS) $(dir $@)
+	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@$(KWAY)
 
 clean :
 	$(RM) $(OBJDIR)/* $(BINDIR)/* $(LIBDIR)/* $(TMPDIR)/*
