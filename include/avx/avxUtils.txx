@@ -166,7 +166,7 @@ void avx<T,8>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
   if(size_1==0) {memcpy(C_,B_,size_2*sizeof(T)); return;}
   if(size_2==0) {memcpy(C_,A_,size_1*sizeof(T)); return;}
 
-  m256 L1,H1,L1p,H1p,L2,H2,L2p,H2p,L3,H3,L3p1,H3p1,L3p,H3p,L4,H4,L4p,H4p,O1,O2,O1p,O2p;
+  m256 L1,H1,L1p,H1p,L2,H2,L2p,H2p,L3,H3,L3p,H3p,O1,O2;
   m256 S1,S2;
   int flag1=0,flag2=0;
   m256* pDest = (m256*)C_;
@@ -223,11 +223,11 @@ void avx<T,8>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
 		L3 = Traits_avx<T>::_mm_min(L2p,H2p);
                 H3 = Traits_avx<T>::_mm_max(L2p,H2p);
 
-		O1p = Traits_avx<T>::_mm_unpacklo(L3,H3);
-		O2p = Traits_avx<T>::_mm_unpackhi(L3,H3);
+		L3p = Traits_avx<T>::_mm_unpacklo(L3,H3);
+		H3p = Traits_avx<T>::_mm_unpackhi(L3,H3);
 
-                O1 = Traits_avx<T>::template _mm_permute2<32>(L4p,H4p);
-                O2 = Traits_avx<T>::template _mm_permute2<49>(L4p,H4p);
+                O1 = Traits_avx<T>::template _mm_permute2<32>(L3p,H3p);
+                O2 = Traits_avx<T>::template _mm_permute2<49>(L3p,H3p);
                 {
                         T* pDest_ = (T*)pDest;
                         if(pDest_-C_+4<=size_1+size_2)
