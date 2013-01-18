@@ -35,7 +35,7 @@
 		#define KWAY 8
 #endif 
 
-		// #define OVERLAP_KWAY_COMM
+// #define OVERLAP_KWAY_COMM
 
 		// #define LOAD_BALANCE_COMM
 
@@ -2388,7 +2388,7 @@ namespace par {
 				// loadBalance instead of following loop. 
 				std::vector<MPI_Request> requests; 
 				MPI_Request sRequests, rq;	
-				MPI_Status  statuses[2*(kway-1)]; // overallocate 
+				MPI_Status  statuses[2*kway]; // overallocate 
 				int r_idx=0; 
 				for(size_t q = 0; q < kway; ++q) 
 				{	
@@ -2437,9 +2437,10 @@ namespace par {
 				requests.clear();
 				
 
-        MPI_Barrier(comm);
+        // MPI_Barrier(comm);
 #ifdef __DEBUG_PAR__				
-        if(!myrank) std::cout << "finished sending sizes" << std::endl;	
+        // if(!myrank) 
+        std::cout << myrank << " finished sending sizes" << std::endl;	
 #endif				
 				//============== Load-Balance here ================/
 				//
@@ -2477,7 +2478,7 @@ namespace par {
 						par::Mpi_Issend<T>( NULL, 0, extra_partner, 1, comm, &(sRequests) );		
 					}
 				}
-				// if (!myrank) std::cout << "finished iSend/Recv data" << std::endl;
+				// if (!myrank) std::cout < "finished iSend/Recv data" << std::endl;
 				
 #ifdef OVERLAP_KWAY_COMM				
 				// overlap here 
@@ -2520,30 +2521,57 @@ namespace par {
 #endif
 	 
 					requests.clear(); rsize.clear(); rbuff.clear();
-        arr_.swap(lbuff); lbuff.clear();
+          arr_.swap(lbuff); lbuff.clear();
 #else // OVERLAP_KWAY_COMM
-					MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
-				#ifdef _PROFILE_SORT
+        MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
+				requests.clear();
+				MPI_Barrier(comm);	
+        
+        // if (!myrank) std::cout << "In non-overlap" << std::endl;
+        #ifdef _PROFILE_SORT
 					hyper_communicate.stop();
 					hyper_merge.start();
 				#endif
 					// resize lbuff
-					int newTotalSize=lbuff.size();
+          // std::cout << myrank << " lbuf " << lbuff.size() << " rsize " << rsize.size() << std::endl;
+					int newTotalSize = lbuff.size();
 					T** A = new T*[rsize.size()+1];
-					size_t* nA = new size_t[rsize.size()+1];	
-					for (int i=0; i<rsize.size(); i++) {
-						newTotalSize += rsize[i];
-						A[i]  = rbuff[i];
-						nA[i] = rsize[i];
+					size_t* nA = new size_t[rsize.size()+1];
+
+					int icnt=0;
+          for (int i=0; i<rsize.size(); i++) {
+            if (!rsize[i]) continue;
+            newTotalSize += rsize[i];
+						A[icnt]  = rbuff[i];
+						nA[icnt] = rsize[i];
+            icnt++;
 					}
+          // std::cout << myrank << " total " << newTotalSize << std::endl;
 					A[rsize.size()]  = &(*(lbuff.begin()));
 					nA[rsize.size()] = lbuff.size();
-					arr_.resize(newTotalSize);
-					par::fan_merge(rsize.size()+1, A, nA, &(*(arr_.begin())));
+          // std::cout << myrank << "resizing" << std::endl;
+          arr_.resize(newTotalSize);
+          // arr_.clear();
+          // T* mArray = new T[newTotalSize];
+          // std::cout << myrank << "done resizing" << std::endl;
+
+          // MPI_Barrier(comm);	
+          // if (!myrank) std::cout << "calling fan merge " << std::endl;
+					par::fan_merge(rsize.size()+1, A, nA, &(*(arr_.begin()))  );
+				  // par::fan_merge(rsize.size()+1, A, nA, mArray);
+          // if (!myrank) std::cout << "done fan merge " << std::endl;
 					
+          // std::copy ( mArray, mArray + newTotalSize, arr_.begin() );
+
+					for (int i=0; i<rsize.size(); i++) {
+            if (!rsize[i]) continue;
+            delete [] rbuff[i];
+          }
+
+          // delete [] mArray;
 					delete [] A;
 					delete [] nA;	
-					requests.clear(); rsize.clear(); rbuff.clear(); lbuff.clear();	
+					rsize.clear(); rbuff.clear(); lbuff.clear();	
 				#ifdef _PROFILE_SORT
 					hyper_merge.stop();
 				#endif					
