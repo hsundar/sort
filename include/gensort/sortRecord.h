@@ -10,7 +10,53 @@ private:
   */
   char      key[10];
   char      value[90];
+
 public:
+  sortRecord() {
+    // key   = new char[10];
+    // value = new char[90]; 
+  }
+  
+  sortRecord(const sortRecord& other) {
+    // key   = new char[10];
+    // value = new char[90];
+
+    memcpy(key,   other.key,   10);
+    memcpy(value, other.value, 90);
+  }
+
+  sortRecord& operator = ( const sortRecord &other) {
+    if (this != &other) // protect against invalid self-assignment
+    {
+      memcpy(key,   other.key,   10);
+      memcpy(value, other.value, 90);
+    }
+    return *this;
+  }
+  ~sortRecord() {
+    /*
+    if (key != NULL) {
+      delete [] key; key = NULL;
+    }
+    if (value != NULL) {
+      delete [] value; value = NULL;
+    }
+    */
+  }
+
+  static sortRecord random() {
+    sortRecord r;
+    unsigned int   * ip;
+    unsigned short * sp = (unsigned short*)(r.key);
+    ip = (unsigned int *)(&(r.key[2]));
+    *ip = rand();
+    ip++;
+    *ip = rand();
+    *sp = rand()%(1<<16);
+    
+    return r;
+  }
+
   // TODO : optimize using SIMD
   bool  operator == ( sortRecord const  &other) const {
     return (memcmp(this->key, other.key, 10) == 0);

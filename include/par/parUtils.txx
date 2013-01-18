@@ -2299,7 +2299,7 @@ namespace par {
 				{
 					std::cout << "kway = " << kway << std::endl;
 					std::cout << "guess: ";
-					for(size_t i = 0; i < guess.size(); ++i)
+          for(size_t i = 0; i < guess.size(); ++i)
 					{
 						std::cout << guess[i] << " " ;
 					}
@@ -2316,14 +2316,14 @@ namespace par {
 					std::cout << std::endl;				
 				}
 #endif
-				std::vector<T> split_key = Sorted_k_Select(arr_, min_idx, max_idx, splitter_ranks, guess, comm); 	
+			  std::vector<T> split_key = Sorted_k_Select(arr_, min_idx, max_idx, splitter_ranks, guess, comm); 	
 					
 #ifdef __DEBUG_PAR__			
 				if (!myrank) 
 				{
 					std::cout << "kway = " << kway << std::endl;
 					std::cout << "split keys size = " << split_key.size() << std::endl;
-					std::cout << "splitters: ";
+          std::cout << "splitters: ";
 					for(size_t i = 0; i < kway-1; ++i)
 					{
 						std::cout << split_key[i] << " " ;
@@ -2433,8 +2433,11 @@ namespace par {
 				MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
 				requests.clear();
 				
-				
-				
+
+        MPI_Barrier(comm);
+#ifdef __DEBUG_PAR__				
+        if(!myrank) std::cout << "finished sending sizes" << std::endl;	
+#endif				
 				//============== Load-Balance here ================/
 				//
 				//  loadBalance:
@@ -2514,10 +2517,16 @@ namespace par {
 	 
         arr_.swap(lbuff); lbuff.clear();
 				
-				// std::cout << myrank << " " << nelem << " " << totSize << std::endl;
+				// if (!myrank) std::cout << myrank << " " << nelem << " " << totSize << std::endl;
 				nelem = arr_.size();
 				par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
-				// if(!myrank) std::cout << nelem << " " << totSize << std::endl;
+				
+#ifdef __DEBUG_PAR__				
+        if(!myrank) std::cout << nelem << " " << totSize << std::endl;
+        if(!myrank) std::cout << "========================split comm======================= " << std::endl;
+
+#endif				
+        
 #ifdef _PROFILE_SORT
 				hyper_comm_split.start();
 #endif				
@@ -3384,12 +3393,14 @@ namespace par {
 #ifdef __DEBUG_PAR__
 			if (!rank) {
 			std::cout << q << ": guesses: \t";
-			for(size_t i = 0; i < q; ++i) {
-				std::cout << guess[i] << "\t";
-			}
+			/*
+      for(size_t i = 0; i < q; ++i) {
+				std::cout << _guess[i] << "\t";
+			} 
+      */
 			std::cout << std::endl;
 			for(size_t i = 0; i < q; ++i) {
-				std::cout << "[ " << min_idx[i] << " | " << K[i] << " | " << max_idx[i] << " ]   ";
+				std::cout << "[ " << range_min[i] << " | " << splitter_ranks[i] << " | " << range_max[i] << " ]   ";
 			}
 			std::cout << std::endl;
 			}

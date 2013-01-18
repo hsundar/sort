@@ -26,9 +26,6 @@ TARGET=$(BINDIR)/main
 all : $(TARGET) 
 
 hyper : CXXFLAGS += -DKWICK
-sample : $(OBJS)
-	-@$(MKDIRS) $(dir $@)
-	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@$(KWAY)
 hyper : $(OBJS)
 	-@$(MKDIRS) $(dir $@)
 	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@$(KWAY)
