@@ -280,11 +280,111 @@ namespace par {
   }//end function
 
 		
-	int AdjustCommunicationPattern(std::vector<int>& send_sizes, std::vector<int>& send_partners,
+	int AdjustCommunicationPattern(std::vector<int>& send_sizes, std::vector<int>& send_partners, 
 				 												 std::vector<int>& recv_sizes, std::vector<int>& recv_partners, MPI_Comm comm) 
 	{
+    int npes;
+    int rank;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &npes);
+		
 		unsigned int k = send_sizes.size();
-		// 
+		
+		// do scans ...
+		DendroIntL lsz[k];
+		DendroIntL gsz[k],  gscan[k];
+		
+		for(size_t i = 0; i < send_sizes.size(); ++i) {
+			lsz[i] = send_sizes[i];
+		}
+		par::Mpi_Scan<DendroIntL>( lsz, gscan, k, MPI_SUM, comm);
+		
+		if (rank == npes-1) {
+			for(size_t i = 0; i < k; ++i) {
+				gsz[i] = gscan[i];
+			}
+		}		
+		// broadcast from last proc to get total counts, per segment ...
+		par::Mpi_Bcast<DendroIntL>( gsz, k, npes-1, comm);
+		
+		DendroIntL segment_p0[k];
+		for(size_t i = 0; i < k; ++i) {
+			segment_p0[i] = (i*npes)/k;
+		}
+		
+		/*
+		 * -- Dividing into k segments, so each segment will have npes/k procs.
+		 * -- Each proc will have gsz[i]/(npes/k) elements.
+		 * -- rank of proc which will get i-th send_buff is,
+		 *        -- segment_p0[i] + gscan[i]    
+		 */
+				
+		// figure out send_partners for k sends
+		// send_partners.clear();
+		for(size_t i = 0; i < k; ++i) {
+			int new_part;
+			int seg_npes  =   ( (i == k-1) ? npes - segment_p0[i] : segment_p0[i+1]-segment_p0[i] );
+			int overhang  =   gsz[i] % seg_npes;
+			DendroIntL rank_mid = gscan[i] - lsz[i]/2;
+			if ( rank_mid < overhang*(gsz[i]/seg_npes + 1)) {
+				new_part = segment_p0[i] + rank_mid/(gsz[i]/seg_npes + 1);
+			} else {
+				new_part = segment_p0[i] + (rank_mid - overhang)/(gsz[i]/seg_npes);	
+			}
+			send_partners[i] = new_part; 
+		}
+		
+		int idx=0;
+		if (send_partners[0] == rank) {
+			send_sizes[0] = 0;
+		}
+		for(size_t i = 1; i < k; ++i)
+		{
+			if (send_partners[i] == rank) {
+				send_sizes[i] = 0;
+				idx = i;
+				continue;
+			}
+			if (send_partners[i] == send_partners[i-1]) {
+				send_sizes[idx] += lsz[i];
+				send_sizes[i]=0;
+			} else {
+					idx = i;
+			}
+		}
+		
+		// let procs know you will be sending to them ...
+	
+		// try MPI one sided comm
+		MPI_Win win;
+		int *rcv;
+	  MPI_Alloc_mem(sizeof(int)*npes, MPI_INFO_NULL, &rcv);
+		for(size_t i = 0; i < npes; ++i) rcv[i] = 0;
+		
+		MPI_Win_create(rcv, npes, sizeof(int), MPI_INFO_NULL,  MPI_COMM_WORLD, &win);
+		
+		
+		MPI_Win_fence(MPI_MODE_NOPRECEDE, win);
+		for (size_t i = 0; i < send_sizes.size(); i++) 
+		{
+			if (send_sizes[i]) {
+		    MPI_Put(&(send_sizes[i]), 1, MPI_INT, send_partners[i], rank, 1, MPI_INT, win);
+			}
+		}	 
+		MPI_Win_fence((MPI_MODE_NOSTORE | MPI_MODE_NOSUCCEED), win);
+		// figure out recv partners and sizes ...
+		recv_sizes.clear(); recv_partners.clear();
+		for(size_t i = 0; i < npes; ++i)
+		{
+			if (rcv[i]) {
+				recv_partners.push_back(i);
+				recv_sizes.push_back(rcv[i]);
+			} 
+		}
+		
+		MPI_Win_free(&win);
+	  MPI_Free_mem(rcv);
+		 
 		return 1;
 	}
 

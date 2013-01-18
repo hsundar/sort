@@ -35,6 +35,9 @@
 		#define KWAY 8
 #endif 
 
+		// #define OVERLAP_KWAY_COMM
+
+		// #define LOAD_BALANCE_COMM
 
 namespace par {
 
@@ -2475,6 +2478,8 @@ namespace par {
 					}
 				}
 				// if (!myrank) std::cout << "finished iSend/Recv data" << std::endl;
+				
+#ifdef OVERLAP_KWAY_COMM				
 				// overlap here 
 				int index[requests.size()], count, remaining;
 				remaining = requests.size();
@@ -2513,9 +2518,37 @@ namespace par {
 #ifdef _PROFILE_SORT
 				hyper_communicate.stop();
 #endif
-				requests.clear(); rsize.clear(); rbuff.clear();
 	 
+					requests.clear(); rsize.clear(); rbuff.clear();
         arr_.swap(lbuff); lbuff.clear();
+#else // OVERLAP_KWAY_COMM
+					MPI_Waitall(requests.size(), &(*(requests.begin())), statuses);
+				#ifdef _PROFILE_SORT
+					hyper_communicate.stop();
+					hyper_merge.start();
+				#endif
+					// resize lbuff
+					int newTotalSize=lbuff.size();
+					T** A = new T*[rsize.size()+1];
+					size_t* nA = new size_t[rsize.size()+1];	
+					for (int i=0; i<rsize.size(); i++) {
+						newTotalSize += rsize[i];
+						A[i]  = rbuff[i];
+						nA[i] = rsize[i];
+					}
+					A[rsize.size()]  = &(*(lbuff.begin()));
+					nA[rsize.size()] = lbuff.size();
+					arr_.resize(newTotalSize);
+					par::fan_merge(rsize.size()+1, A, nA, &(*(arr_.begin())));
+					
+					delete [] A;
+					delete [] nA;	
+					requests.clear(); rsize.clear(); rbuff.clear(); lbuff.clear();	
+				#ifdef _PROFILE_SORT
+					hyper_merge.stop();
+				#endif					
+#endif // OVERLAP_KWAY_COMM
+									
 				
 				// if (!myrank) std::cout << myrank << " " << nelem << " " << totSize << std::endl;
 				nelem = arr_.size();
@@ -3481,6 +3514,42 @@ namespace par {
 			return selects;			
 		
 		} // end function - kSelect
+
+		template <class T>
+		void fan_merge(int k, T** A, size_t* n, T* C_){
+		  size_t totSize=0;
+		  std::vector<size_t> disp(k+1,0);
+		  for(int i=0;i<k;i++){
+		    totSize+=n[i];
+		    disp[i+1]=disp[i]+n[i];
+		  }
+
+		  T* B_=new T[totSize];
+		  T* B=B_;
+		  T* C=C_;
+		  for(int j=1;j<k;j=j*2){
+		    for(int i=0;i<k;i=i+2*j){
+		      if(i+j<k){
+		        //omp_par::merge(A[i],A[i]+n[i],A[i+j],A[i+j]+n[i+j],&B[disp[i]],k, std::less<T>());
+		        std::merge(A[i],A[i]+n[i],A[i+j],A[i+j]+n[i+j],&B[disp[i]]);
+		        A[i]=&B[disp[i]];
+		        n[i]=n[i]+n[i+j];
+		      }else{
+		        memcpy(&B[disp[i]], A[i], n[i]*sizeof(T));
+		        A[i]=&B[disp[i]];
+		      }
+		    }
+		    B=C; //Swap buffers.
+		    C=A[0];
+		  }
+
+			// Final result should be in C_;
+		  if(C_!=A[0]) memcpy(C_, A[0], totSize*sizeof(T));
+
+		  //Free memory.
+		  delete[] B_;
+		}
+
 
 		template<typename T>
 		int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz) 
