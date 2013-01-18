@@ -3,13 +3,13 @@
 #include <iterator>
 #include <vector>
 #include <seqUtils.h>
-#include <sseUtils.h>
-#include <avxUtils.h>
 
 #ifdef SIMD_MERGE
+	#include <sseUtils.h>
+	#include <avxUtils.h>
 	#if SIMD_MERGE==128
 		#define MERGE_FUNCTION sse<_ValType> 
-	#else SIMD_MERGE==256
+	#elif SIMD_MERGE==256
 		#define MERGE_FUNCTION avx<_ValType>
 	#endif
 #else
