@@ -517,16 +517,18 @@ int main(int argc, char **argv){
 }
 
 void printResults(int num_threads, MPI_Comm comm) {
-	int myrank, p;
+	int myrank, p, simd_width=0;
 	MPI_Comm_size(comm, &p);
 	MPI_Comm_rank(comm, &myrank);
-	
+#ifdef SIMD_MERGE
+	simd_width=SIMD_MERGE;
+#endif
 		// reduce results
 		double t, meanV, minV, maxV;
 		if (!myrank) {
 			// std::cout << std::endl;
 			// std::cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" << std::endl;
-			std::cout <<  p << " tasks : " << num_threads << " threads" << std::endl;
+			std::cout <<  p << " tasks : " << num_threads << " threads " << simd_width << " SIMD_WIDTH " << std::endl;
 			// std::cout << "===========================================================================" << std::endl;
 		}
 		t = total_sort.seconds; 			getStats(t, &meanV, &minV, &maxV, comm);

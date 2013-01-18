@@ -4,6 +4,17 @@
 #include <vector>
 #include <seqUtils.h>
 #include <sseUtils.h>
+#include <avxUtils.h>
+
+#ifdef SIMD_MERGE
+	#if SIMD_MERGE==128
+		#define MERGE_FUNCTION sse<_ValType> 
+	#else SIMD_MERGE==256
+		#define MERGE_FUNCTION avx<_ValType>
+	#endif
+#else
+	#define MERGE_FUNCTION std
+#endif
 
 template <class T,class StrictWeakOrdering>
 void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering comp){
@@ -82,7 +93,8 @@ void omp_par::merge(T A_,T A_last,T B_,T B_last,T C_,int p,StrictWeakOrdering co
   for(int i=0;i<p;i++){
     T C=C_+split_indx_A[i]+split_indx_B[i];
     //std::merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C,comp);
-    sse<_ValType>::merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C);
+    //sse<_ValType>::merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C);
+    MERGE_FUNCTION::merge(A_+split_indx_A[i],A_+split_indx_A[i+1],B_+split_indx_B[i],B_+split_indx_B[i+1],C);
   }
   delete[] split_indx_A;
   delete[] split_indx_B;

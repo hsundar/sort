@@ -6,7 +6,7 @@
 template <class T>
 //#pragma intel optimization_parameter target_arch=avx
 void avx<T,4>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
-  //printf("Performing AVX merge for integers\n");
+  //printf("Performing AVX merge for floats\n");
   //c = Traits<T>::_mm_min(a,b);
   //std::cout<<"size: 4\n"; //TODO: Your code here
   //float d = Traits<T>::_mm_min(A_[0],A_[1]);
@@ -47,49 +47,49 @@ void avx<T,4>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
                 for(;i<8;i++)
                         temp2[i]=max;
   }
-  S1 = Traits<T>::_mm_load(temp1);
-  S2 = Traits<T>::_mm_load(temp2);
+  S1 = Traits_avx<T>::_mm_load(temp1);
+  S2 = Traits_avx<T>::_mm_load(temp2);
   size1 = size2 = 8;
   temp1 += 8;temp2 += 8;
 
   while(1){
 				/*Need to reverse S2 registers*/
-                S2 = Traits<T>::template _mm_permute2<1>(S2,S2);
-                S2 = Traits<T>::template _mm_permute<27>(S2);
+                S2 = Traits_avx<T>::template _mm_permute2<1>(S2,S2);
+                S2 = Traits_avx<T>::template _mm_permute<27>(S2);
                 
-		L1 = Traits<T>::_mm_min(S1,S2);
-                H1 = Traits<T>::_mm_max(S1,S2);
+		L1 = Traits_avx<T>::_mm_min(S1,S2);
+                H1 = Traits_avx<T>::_mm_max(S1,S2);
                 
-		L1p = Traits<T>::template _mm_permute2<32>(L1,H1);
-                H1p = Traits<T>::template _mm_permute2<49>(L1,H1);
+		L1p = Traits_avx<T>::template _mm_permute2<32>(L1,H1);
+                H1p = Traits_avx<T>::template _mm_permute2<49>(L1,H1);
 
-                L2 = Traits<T>::_mm_min(L1p,H1p);
-                H2 = Traits<T>::_mm_max(L1p,H1p);
+                L2 = Traits_avx<T>::_mm_min(L1p,H1p);
+                H2 = Traits_avx<T>::_mm_max(L1p,H1p);
                 
-		L2p = Traits<T>::template _mm_shuffle<68>(L2,H2);
-                H2p = Traits<T>::template _mm_shuffle<238>(L2,H2);
+		L2p = Traits_avx<T>::template _mm_shuffle<68>(L2,H2);
+                H2p = Traits_avx<T>::template _mm_shuffle<238>(L2,H2);
                 
-		L3 = Traits<T>::_mm_min(L2p,H2p);
-                H3 = Traits<T>::_mm_max(L2p,H2p);
+		L3 = Traits_avx<T>::_mm_min(L2p,H2p);
+                H3 = Traits_avx<T>::_mm_max(L2p,H2p);
 
-		L3p1 = Traits<T>::_mm_unpacklo(L3,H3);
-		H3p1 = Traits<T>::_mm_unpackhi(L3,H3);
+		L3p1 = Traits_avx<T>::_mm_unpacklo(L3,H3);
+		H3p1 = Traits_avx<T>::_mm_unpackhi(L3,H3);
 
-		L3p = Traits<T>::template _mm_shuffle<68>(L3p1,H3p1);
-		H3p = Traits<T>::template _mm_shuffle<238>(L3p1,H3p1);
+		L3p = Traits_avx<T>::template _mm_shuffle<68>(L3p1,H3p1);
+		H3p = Traits_avx<T>::template _mm_shuffle<238>(L3p1,H3p1);
 		
-		L4 = Traits<T>::_mm_min(L3p,H3p);
-                H4 = Traits<T>::_mm_max(L3p,H3p);
+		L4 = Traits_avx<T>::_mm_min(L3p,H3p);
+                H4 = Traits_avx<T>::_mm_max(L3p,H3p);
 
-		L4p = Traits<T>::_mm_unpacklo(L4,H4);
-		H4p = Traits<T>::_mm_unpackhi(L4,H4);
+		L4p = Traits_avx<T>::_mm_unpacklo(L4,H4);
+		H4p = Traits_avx<T>::_mm_unpackhi(L4,H4);
 
-                O1 = Traits<T>::template _mm_permute2<32>(L4p,H4p);
-                O2 = Traits<T>::template _mm_permute2<49>(L4p,H4p);
+                O1 = Traits_avx<T>::template _mm_permute2<32>(L4p,H4p);
+                O2 = Traits_avx<T>::template _mm_permute2<49>(L4p,H4p);
                 {
                         T* pDest_ = (T*)pDest;
                         if(pDest_-C_+8<=size_1+size_2)
-                                Traits<T>::_mm_store(pDest,O1);
+                                Traits_avx<T>::_mm_store(pDest,O1);
                         else{
                                 T* O1_=(T*)&O1;
                                 for(int i=0;i<8;i++)
@@ -105,7 +105,7 @@ void avx<T,4>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
                         T* pDest_ = (T*)pDest;
                         for(int i=0;i<8;i++)
                                 if(&pDest_[i]-C_<size_1+size_2) pDest_[i]=O2_[i];
-                        //Traits<T>::_mm_store(pDest,O2);
+                        //Traits_avx<T>::_mm_store(pDest,O2);
                         return;
                 }
                 if(sizeadj_1 != size_1 && size1 >= sizeadj_1 && !flag1){//we need to start padding
@@ -129,23 +129,23 @@ void avx<T,4>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
                                 temp2[i]=max;
                 }
                 if(size1 >= size_1){
-                        S2 = Traits<T>::_mm_load(temp2);
+                        S2 = Traits_avx<T>::_mm_load(temp2);
                         size2 += 8;
                         temp2 += 8;
                 }
                 else if(size2 >= size_2){
-                        S2 = Traits<T>::_mm_load(temp1);
+                        S2 = Traits_avx<T>::_mm_load(temp1);
                         size1 += 8;
                         temp1 += 8;
                 }
                 else{
                         if(*temp1 < *temp2){
-                                S2 = Traits<T>::_mm_load(temp1);
+                                S2 = Traits_avx<T>::_mm_load(temp1);
                                 size1 += 8;
                                 temp1 += 8;
                         }
                         else{
-                                S2 = Traits<T>::_mm_load(temp2);
+                                S2 = Traits_avx<T>::_mm_load(temp2);
                                 size2 += 8;
                                 temp2 += 8;
                         }
@@ -157,6 +157,7 @@ void avx<T,4>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
 //#pragma intel optimization_parameter target_arch=avx
 template <class T>
 void avx<T,8>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
+  //std::cout<<"Performing AVX merge on doubles!\n"; //TODO: Your code here
   //c = Traits<T>::_mm_min(a,b);
   //std::cout<<"size: 4\n"; //TODO: Your code here
   //float d = Traits<T>::_mm_min(A_[0],A_[1]);
@@ -165,7 +166,7 @@ void avx<T,8>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
   if(size_1==0) {memcpy(C_,B_,size_2*sizeof(T)); return;}
   if(size_2==0) {memcpy(C_,A_,size_1*sizeof(T)); return;}
 
-  m256 L1,H1,L1p,H1p,L2,H2,L2p,H2p,L3,H3,L3p1,H3p1,L3p,H3p,L4,H4,L4p,H4p,O1,O2;
+  m256 L1,H1,L1p,H1p,L2,H2,L2p,H2p,L3,H3,L3p1,H3p1,L3p,H3p,L4,H4,L4p,H4p,O1,O2,O1p,O2p;
   m256 S1,S2;
   int flag1=0,flag2=0;
   m256* pDest = (m256*)C_;
@@ -197,40 +198,40 @@ void avx<T,8>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
                 for(;i<4;i++)
                         temp2[i]=max;
   }
-  S1 = Traits<T>::_mm_load(temp1);
-  S2 = Traits<T>::_mm_load(temp2);
+  S1 = Traits_avx<T>::_mm_load(temp1);
+  S2 = Traits_avx<T>::_mm_load(temp2);
   size1 = size2 = 4;
   temp1 += 4;temp2 += 4;
 
   while(1){
 				/*Need to reverse S2 registers*/
-                S2 = Traits<T>::template _mm_permute2<1>(S2,S2);
-                S2 = Traits<T>::template _mm_permute<5>(S2);
+                S2 = Traits_avx<T>::template _mm_permute2<1>(S2,S2);
+                S2 = Traits_avx<T>::template _mm_permute<5>(S2);
                 
-		L1 = Traits<T>::_mm_min(S1,S2);
-                H1 = Traits<T>::_mm_max(S1,S2);
+		L1 = Traits_avx<T>::_mm_min(S1,S2);
+                H1 = Traits_avx<T>::_mm_max(S1,S2);
                 
-		L1p = Traits<T>::template _mm_permute2<32>(L1,H1);
-                H1p = Traits<T>::template _mm_permute2<49>(L1,H1);
+		L1p = Traits_avx<T>::template _mm_permute2<32>(L1,H1);
+                H1p = Traits_avx<T>::template _mm_permute2<49>(L1,H1);
 
-                L2 = Traits<T>::_mm_min(L1p,H1p);
-                H2 = Traits<T>::_mm_max(L1p,H1p);
+                L2 = Traits_avx<T>::_mm_min(L1p,H1p);
+                H2 = Traits_avx<T>::_mm_max(L1p,H1p);
                 
-		L2p = Traits<T>::template _mm_shuffle<0>(L2,H2);
-                H2p = Traits<T>::template _mm_shuffle<15>(L2,H2);
+		L2p = Traits_avx<T>::template _mm_shuffle<0>(L2,H2);
+                H2p = Traits_avx<T>::template _mm_shuffle<15>(L2,H2);
                 
-		L3 = Traits<T>::_mm_min(L2p,H2p);
-                H3 = Traits<T>::_mm_max(L2p,H2p);
+		L3 = Traits_avx<T>::_mm_min(L2p,H2p);
+                H3 = Traits_avx<T>::_mm_max(L2p,H2p);
 
-		O1p = Traits<T>::_mm_unpacklo(L3,H3);
-		O2p = Traits<T>::_mm_unpackhi(L3,H3);
+		O1p = Traits_avx<T>::_mm_unpacklo(L3,H3);
+		O2p = Traits_avx<T>::_mm_unpackhi(L3,H3);
 
-                O1 = Traits<T>::template _mm_permute2<32>(L4p,H4p);
-                O2 = Traits<T>::template _mm_permute2<49>(L4p,H4p);
+                O1 = Traits_avx<T>::template _mm_permute2<32>(L4p,H4p);
+                O2 = Traits_avx<T>::template _mm_permute2<49>(L4p,H4p);
                 {
                         T* pDest_ = (T*)pDest;
                         if(pDest_-C_+4<=size_1+size_2)
-                                Traits<T>::_mm_store(pDest,O1);
+                                Traits_avx<T>::_mm_store(pDest,O1);
                         else{
                                 T* O1_=(T*)&O1;
                                 for(int i=0;i<4;i++)
@@ -270,23 +271,23 @@ void avx<T,8>::merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
                                 temp2[i]=max;
                 }
                 if(size1 >= size_1){
-                        S2 = Traits<T>::_mm_load(temp2);
+                        S2 = Traits_avx<T>::_mm_load(temp2);
                         size2 += 4;
                         temp2 += 4;
                 }
                 else if(size2 >= size_2){
-                        S2 = Traits<T>::_mm_load(temp1);
+                        S2 = Traits_avx<T>::_mm_load(temp1);
                         size1 += 4;
                         temp1 += 4;
                 }
                 else{
                         if(*temp1 < *temp2){
-                                S2 = Traits<T>::_mm_load(temp1);
+                                S2 = Traits_avx<T>::_mm_load(temp1);
                                 size1 += 4;
                                 temp1 += 4;
                         }
                         else{
-                                S2 = Traits<T>::_mm_load(temp2);
+                                S2 = Traits_avx<T>::_mm_load(temp2);
                                 size2 += 4;
                                 temp2 += 4;
                         }

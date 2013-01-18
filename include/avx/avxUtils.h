@@ -8,7 +8,7 @@
 #include <smmintrin.h>
 
 template <class T>
-class Traits{
+class Traits_avx{
  public:
   static const int size=-1;
  };
@@ -136,7 +136,7 @@ class Traits<int>{
     
 };*/
 template <>
-class Traits<float>{
+class Traits_avx<float>{
   public:
     typedef __m256 m256; 
     static const int size=sizeof(float);
@@ -164,10 +164,10 @@ class Traits<float>{
 	static inline __m256 _mm_max(__m256 a, __m256 b){
 		return _mm256_max_ps(a,b);
 	}
-	static inline __m256 _mm256_unpacklo(__m256 a, __m256 b){
+	static inline __m256 _mm_unpacklo(__m256 a, __m256 b){
 		return _mm256_unpacklo_ps(a,b);
 	}
-	static inline __m256 _mm256_unpackhi(__m256 a, __m256 b){
+	static inline __m256 _mm_unpackhi(__m256 a, __m256 b){
 		return _mm256_unpackhi_ps(a,b);
 	}
     
@@ -182,7 +182,7 @@ class Traits<long>{
 */
 
 template <>
-class Traits<double>{
+class Traits_avx<double>{
   public:
     typedef __m256d m256; 
     static const int size=sizeof(double);
@@ -210,10 +210,10 @@ class Traits<double>{
 	static inline __m256d _mm_max(__m256d a, __m256d b){
 		return _mm256_max_pd(a,b);
 	}
-	static inline __m256d _mm256_unpacklo(__m256d a, __m256d b){
+	static inline __m256d _mm_unpacklo(__m256d a, __m256d b){
 		return _mm256_unpacklo_pd(a,b);
 	}
-	static inline __m256d _mm256_unpackhi(__m256d a, __m256d b){
+	static inline __m256d _mm_unpackhi(__m256d a, __m256d b){
 		return _mm256_unpackhi_pd(a,b);
 	}
     
@@ -222,7 +222,7 @@ class Traits<double>{
 
 
 // Generic.
-template <class T, int size=Traits<T>::size>
+template <class T, int size=Traits_avx<T>::size>
 class avx{
   public:
     static void merge(T* A_, T* A_last,T* B_, T* B_last, T* C_){
@@ -234,7 +234,7 @@ class avx{
 template <class T>
 class avx<T,4>{
   public:
-    typedef typename Traits<T>::m256 m256;
+    typedef typename Traits_avx<T>::m256 m256;
     static void merge(T* A_, T* A_last,T* B_, T* B_last, T* C_);
 };
 
@@ -242,7 +242,7 @@ class avx<T,4>{
 template <class T>
 class avx<T,8>{
  public:
-  typedef typename Traits<T>::m256 m256;
+  typedef typename Traits_avx<T>::m256 m256;
   static void merge(T* A_, T* A_last,T* B_, T* B_last, T* C_);
 };
 
