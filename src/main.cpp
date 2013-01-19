@@ -34,6 +34,15 @@
 
 // #define __VERIFY__
 
+
+enum DistribType{
+	UNIF_DISTRIB,
+	GAUSS_DISTRIB,
+	ZIPF_DISTRIB
+};
+
+int zipf(double alpha, int n, unsigned int *seedp);
+
 void printResults(int num_threads, MPI_Comm comm);
 
 void getStats(double val, double *meanV, double *minV, double *maxV, MPI_Comm comm) 
@@ -45,6 +54,16 @@ void getStats(double val, double *meanV, double *minV, double *maxV, MPI_Comm co
 	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_SUM, 0, comm); *meanV = d/p;
 	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MIN, 0, comm); *minV = d;
 	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MAX, 0, comm); *maxV = d;
+}
+
+DistribType getDistType(char* code) {
+	if(!strcmp(code,"GAUSS\0")){
+		return GAUSS_DISTRIB;
+	}else if(!strcmp(code,"ZIPF\0")){
+		return ZIPF_DISTRIB;
+	}else{
+		return UNIF_DISTRIB;
+	}
 }
 
 long getNumElements(char* code) {
@@ -151,7 +170,7 @@ bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
   return true;
 }
 
-double time_sort_bench(size_t N, MPI_Comm comm) {
+double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
   int myrank, p;
 
   MPI_Comm_rank(comm, &myrank);
@@ -211,7 +230,7 @@ double time_sort_bench(size_t N, MPI_Comm comm) {
   return wtime;
 }
 
-double time_sort_tn(size_t N, MPI_Comm comm) {
+double time_sort_tn(size_t N, MPI_Comm comm, DistribType dist_type) {
   int myrank, p;
 
   MPI_Comm_rank(comm, &myrank);
@@ -273,7 +292,7 @@ double time_sort_tn(size_t N, MPI_Comm comm) {
 }
 
 template <class T>
-double time_sort(size_t N, MPI_Comm comm){
+double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   int myrank, p;
 
   MPI_Comm_rank(comm, &myrank);
@@ -282,15 +301,41 @@ double time_sort(size_t N, MPI_Comm comm){
 
   // Geerate random data
   std::vector<T> in(N);
-#pragma omp parallel for
-  for(int j=0;j<omp_p;j++){
-    unsigned int seed=j*p+myrank;
-    size_t start=(j*N)/omp_p;
-    size_t end=((j+1)*N)/omp_p;
-    for(unsigned int i=start;i<end;i++){ 
-      in[i]=rand_r(&seed);
+	if(dist_type==UNIF_DISTRIB){
+    #pragma omp parallel for
+    for(int j=0;j<omp_p;j++){
+      unsigned int seed=j*p+myrank;
+      size_t start=(j*N)/omp_p;
+      size_t end=((j+1)*N)/omp_p;
+      for(unsigned int i=start;i<end;i++){ 
+        in[i]=rand_r(&seed);
+      }
     }
-  }
+	}else if(dist_type==GAUSS_DISTRIB){
+    double e=2.7182818284590452;
+    double log_e=log(e);
+
+    #pragma omp parallel for
+    for(int j=0;j<omp_p;j++){
+      unsigned int seed=j*p+myrank;
+      size_t start=(j*N)/omp_p;
+      size_t end=((j+1)*N)/omp_p;
+      for(unsigned int i=start;i<end;i++){ 
+        in[i]=sqrt(-2*log(rand_r(&seed)*1.0/RAND_MAX)/log_e)
+              * cos(rand_r(&seed)*2*M_PI/RAND_MAX)*RAND_MAX*0.1;
+      }
+    }
+	}else if(dist_type==ZIPF_DISTRIB){
+    #pragma omp parallel for
+    for(int j=0;j<omp_p;j++){
+      unsigned int seed=j*p+myrank;
+      size_t start=(j*N)/omp_p;
+      size_t end=((j+1)*N)/omp_p;
+      for(unsigned int i=start;i<end;i++){ 
+        in[i]=zipf(2.0, 3, &seed);
+      }
+    }
+	}
   // for(unsigned int i=0;i<N;i++) in[i]=binOp::reversibleHash(myrank*i); 
   // std::cout << "finished generating data " << std::endl;
   std::vector<T> in_cpy=in;
@@ -374,7 +419,7 @@ double time_sort(size_t N, MPI_Comm comm){
 
 int main(int argc, char **argv){
   if (argc < 3) {
-    std::cerr << "Usage: " << argv[0] << " numThreads typeSize" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
 		std::cerr << "\t\t typeSize can be d-double, f-float, i-int, l-long, t-TreeNode or x-100byte record." << std::endl;
     std::cerr << "\t\t Examples:" << std::endl;
@@ -382,6 +427,7 @@ int main(int argc, char **argv){
     std::cerr << "\t\t l1GB : long     array of size 1GB" << std::endl;
     std::cerr << "\t\t t1GB : TreeNode array of size 1GB" << std::endl;
     std::cerr << "\t\t x4GB : 100byte  array of size 4GB" << std::endl;
+		std::cerr << "\t\t typeDistrib can be UNIF, GAUSS, ZIPF." << std::endl;
     return 1;  
   }
 
@@ -413,6 +459,7 @@ int main(int argc, char **argv){
   int k = 0; // in case size based runs are needed 
   char dtype = argv[2][0];
   long N = getNumElements(argv[2]);
+	DistribType dist_type=getDistType(argv[3]);
   if (!N) {
     std::cerr << "illegal typeSize code provided: " << argv[2] << std::endl;
     return 2;
@@ -428,22 +475,22 @@ int main(int argc, char **argv){
     
     switch(dtype) {
 			case 'd':
-				ttt = time_sort<double>(N, MPI_COMM_WORLD);
+				ttt = time_sort<double>(N, MPI_COMM_WORLD,dist_type);
 				break;
 			case 'f':
-				ttt = time_sort<float>(N, MPI_COMM_WORLD);
+				ttt = time_sort<float>(N, MPI_COMM_WORLD,dist_type);
 				break;	
 			case 'i':
-				ttt = time_sort<int>(N, MPI_COMM_WORLD);
+				ttt = time_sort<int>(N, MPI_COMM_WORLD,dist_type);
 				break;
       case 'l':
-        ttt = time_sort<long>(N, MPI_COMM_WORLD);
+        ttt = time_sort<long>(N, MPI_COMM_WORLD,dist_type);
         break;
       case 't':
-        ttt = time_sort_tn(N, MPI_COMM_WORLD);
+        ttt = time_sort_tn(N, MPI_COMM_WORLD,dist_type);
         break;
       case 'x':
-        ttt = time_sort_bench(N, MPI_COMM_WORLD);
+        ttt = time_sort_bench(N, MPI_COMM_WORLD,dist_type);
         break;
     };
 #ifdef _PROFILE_SORT 			
@@ -472,22 +519,22 @@ int main(int argc, char **argv){
 
     switch(dtype) {
 			case 'd':
-				ttt = time_sort<double>(N, comm);
+				ttt = time_sort<double>(N, comm,dist_type);
 				break;
 			case 'f':
-				ttt = time_sort<float>(N, comm);
+				ttt = time_sort<float>(N, comm,dist_type);
 				break;	
 			case 'i':
-        ttt = time_sort<int>(N, comm);
+        ttt = time_sort<int>(N, comm,dist_type);
         break;
       case 'l':
-        ttt = time_sort<long>(N, comm);
+        ttt = time_sort<long>(N, comm,dist_type);
         break;
       case 't':
-        ttt = time_sort_tn(N, comm);
+        ttt = time_sort_tn(N, comm,dist_type);
         break;
       case 'x':
-        ttt = time_sort_bench(N, comm);
+        ttt = time_sort_bench(N, comm,dist_type);
         break;
     };
 
@@ -596,3 +643,60 @@ void printResults(int num_threads, MPI_Comm comm) {
 		}			 
 }
 
+#define  FALSE          0       // Boolean false
+#define  TRUE           1       // Boolean true
+//===========================================================================
+//=  Function to generate Zipf (power law) distributed random variables     =
+//=    - Input: alpha and N                                                 =
+//=    - Output: Returns with Zipf distributed random variable              =
+//===========================================================================
+int zipf(double alpha, int n, unsigned int *seedp)
+{
+  static int first = TRUE;      // Static first time flag
+  static double c = 0;          // Normalization constant
+  double z;                     // Uniform random number (0 < z < 1)
+  double sum_prob;              // Sum of probabilities
+  double zipf_value;            // Computed exponential value to be returned
+  int    i;                     // Loop counter
+
+  // Compute normalization constant on first call only
+  if (first == TRUE)
+  {
+    for (i=1; i<=n; i++)
+      c = c + (1.0 / pow((double) i, alpha));
+    c = 1.0 / c;
+    first = FALSE;
+  }
+
+  // Pull a uniform random number (0 < z < 1)
+  do
+  {
+    z = rand_r(seedp)*(1.0/RAND_MAX);
+  }
+  while ((z == 0) || (z == 1));
+
+	static std::vector<double> oopia;
+	#pragma omp critical
+	if(oopia.size()!=n){
+		oopia.resize(n);
+		for(int i=0;i<n;i++)
+			oopia[i]=1.0/pow((double) i, alpha);
+	}
+
+  // Map z to the value
+  sum_prob = 0;
+  for (i=1; i<=n; i++)
+  {
+    sum_prob = sum_prob + c*oopia[i-1];
+    if (sum_prob >= z)
+    {
+      zipf_value = i;
+      break;
+    }
+  }
+
+  // Assert that zipf_value is between 1 and N
+  assert((zipf_value >=1) && (zipf_value <= n));
+
+  return(zipf_value);
+}

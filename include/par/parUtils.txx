@@ -2022,7 +2022,7 @@ namespace par {
       // if(arr_!=NULL) delete[] arr_;
 
       // par::partitionW<T>(SortedElem, NULL , comm_);
-      par::partitionW<T>(arr, NULL , comm_);
+//      par::partitionW<T>(arr, NULL , comm_);
 
       PROF_SORT_END
     }//end function
@@ -2219,7 +2219,7 @@ namespace par {
 #ifdef _PROFILE_SORT
 		 	sort_partitionw.start();
 #endif
-      par::partitionW<T>(SortedElem, NULL , comm_);
+//      par::partitionW<T>(SortedElem, NULL , comm_);
 #ifdef _PROFILE_SORT
 		 	sort_partitionw.stop();
 #endif
@@ -2610,7 +2610,7 @@ namespace par {
 #ifdef _PROFILE_SORT
 		 	sort_partitionw.start();
 #endif
-      par::partitionW<T>(SortedElem, NULL , comm_);
+//      par::partitionW<T>(SortedElem, NULL , comm_);
 #ifdef _PROFILE_SORT
 		 	sort_partitionw.stop();
 #endif
@@ -2674,7 +2674,7 @@ namespace par {
           std::cout <<" Using bitonic sort since totSize < (5*(npes^2)). totSize: "
             <<totSize<<" npes: "<<npes <<std::endl;
         }
-        par::partitionW<T>(arr, NULL, comm);
+//        par::partitionW<T>(arr, NULL, comm);
 
 #ifdef __DEBUG_PAR__
         MPI_Barrier(comm);
@@ -2729,7 +2729,7 @@ namespace par {
 #ifdef _PROFILE_SORT
   		sort_partitionw.start();
 #endif
-			par::partitionW<T>(arr, NULL, comm);
+//			par::partitionW<T>(arr, NULL, comm);
 #ifdef _PROFILE_SORT
   		sort_partitionw.stop();
 #endif
