@@ -418,7 +418,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 }
 
 int main(int argc, char **argv){
-  if (argc < 3) {
+  if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
 		std::cerr << "\t\t typeSize can be d-double, f-float, i-int, l-long, t-TreeNode or x-100byte record." << std::endl;
