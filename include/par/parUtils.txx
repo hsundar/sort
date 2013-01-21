@@ -2318,8 +2318,9 @@ namespace par {
           }
 
           // Communicate data.
+          int asynch_count=2;
           recv_iter=0;
-					int merg_indx=0;
+					int merg_indx=2;
           std::vector<MPI_Request> reqst(kway*2);
           std::vector<MPI_Status> status(kway*2);
           arr_ .resize(recv_disp[kway]);
@@ -2330,18 +2331,16 @@ namespace par {
             for(int j=0;j<(i_==0 || i_==kway/2?1:2);j++){
               int i=(i_==0?i1:((j+blk_id/i_)%2?i1:i2));
               int partner=blk_size*i+new_pid;
-              //MPI_Status status;
-              //MPI_Sendrecv(&arr [send_disp[     i   ]], send_size[     i   ], par::Mpi_datatype<T>::value(), partner, 0,
-              //             &arr_[recv_disp[recv_iter]], recv_size[recv_iter], par::Mpi_datatype<T>::value(), partner, 0, comm, &status);
+
+              if(recv_iter-asynch_count-1>=0) MPI_Waitall(2, &reqst[(recv_iter-asynch_count-1)*2], &status[(recv_iter-asynch_count-1)*2]);
               par::Mpi_Irecv <T>(&arr_[recv_disp[recv_iter]], recv_size[recv_iter], partner, 1, comm, &reqst[recv_iter*2+0]);
               par::Mpi_Issend<T>(&arr [send_disp[     i   ]], send_size[     i   ], partner, 1, comm, &reqst[recv_iter*2+1]);
-              //MPI_Waitall(2, &reqst[recv_iter*2], &status[recv_iter*2]);
               recv_iter++;
 
-              merg_indx++;
-              if(merg_indx>0)
-              {// Merge.
-                MPI_Waitall(2, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
+              int flag[2]={0,0};
+              if(recv_iter>merg_indx) MPI_Test(&reqst[(merg_indx-1)*2],&flag[0],&status[(merg_indx-1)*2]);
+              if(recv_iter>merg_indx) MPI_Test(&reqst[(merg_indx-2)*2],&flag[1],&status[(merg_indx-2)*2]);
+              if(flag[0] && flag[1]){
                 T* A=&arr_[0]; T* B=&arr__[0];
                 for(int s=2;merg_indx%s==0;s*=2){
                   //std    ::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
@@ -2350,15 +2349,19 @@ namespace par {
                                  &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]],omp_p,std::less<T>());
                   T* C=A; A=B; B=C; // Swap
                 }
+                merg_indx+=2;
               }
             }
           }
+#ifdef _PROFILE_SORT
+				hyper_communicate.stop();
+				hyper_merge.start();
+#endif
 					// Merge remaining parts.
-          while(merg_indx<(int)kway){
-              merg_indx++;
-              if(merg_indx>0)
-              {// Merge.
-                MPI_Waitall(2, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
+          while(merg_indx<=(int)kway){
+              MPI_Waitall(1, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
+              MPI_Waitall(1, &reqst[(merg_indx-2)*2], &status[(merg_indx-2)*2]);
+              {
                 T* A=&arr_[0]; T* B=&arr__[0];
                 for(int s=2;merg_indx%s==0;s*=2){
                   //std    ::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
@@ -2367,6 +2370,7 @@ namespace par {
                                  &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]],omp_p,std::less<T>());
                   T* C=A; A=B; B=C; // Swap
                 }
+                merg_indx+=2;
               }
           }
 					{// Swap buffers.
@@ -2378,7 +2382,7 @@ namespace par {
 				}
 
 #ifdef _PROFILE_SORT
-				hyper_communicate.stop();
+				hyper_merge.stop();
 				hyper_comm_split.start();
 #endif
 				{// Split comm. kway  O( log(p) ) ??
