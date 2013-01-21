@@ -380,6 +380,10 @@ namespace par {
   template <typename T>
     int Mpi_Alltoallv_dense(T* sbuff_, int* s_cnt_, int* sdisp_,
         T* rbuff_, int* r_cnt_, int* rdisp_, MPI_Comm c){
+
+      //std::vector<double> tt(4096*200,0);
+      //std::vector<double> tt_wait(4096*200,0);
+
 #ifdef __PROFILE_WITH_BARRIER__
       MPI_Barrier(comm);
 #endif
@@ -413,6 +417,7 @@ namespace par {
     memcpy(&sbuff[sdisp[i]]+2*sizeof(int),&sbuff_[sdisp_[i]],s_cnt[i]-2*sizeof(int));
   }
 
+  //int t_indx=0;
   int iter_cnt=0;
   while(range[1]-range[0]>1){
     iter_cnt++;
@@ -463,22 +468,45 @@ namespace par {
       }
 
       //Sendrecv data.
-      /*
-      for(int i=0;i<kway;i++){
-        MPI_Status status;
-        int cmp_np=new_range[i+1]-new_range[i];
-        int partner=(pid<cmp_np?       new_range[i]+pid: new_range[i+1]-1) ;
-        MPI_Sendrecv(&sbuff[sdisp[new_range[i]]], s_cnt[new_range[i+1]-1]+sdisp[new_range[i+1]-1]-sdisp[new_range[i]], MPI_BYTE, partner, 0,
-                     &rbuff[rdisp[new_np  *(i)]], r_cnt[new_np  *(i+1)-1]+rdisp[new_np  *(i+1)-1]-rdisp[new_np  *(i)], MPI_BYTE, partner, 0, c, &status);
+      //*
+      int my_block=kway;
+      while(pid<new_range[my_block]) my_block--;
+//      MPI_Barrier(c);
+      for(int i_=0;i_<=kway/2;i_++){
+        int i1=(my_block+i_)%kway;
+        int i2=(my_block+kway-i_)%kway;
 
-        //Handle extra communication.
-        if(pid==new_np-1 && cmp_np>new_np){
-          int partner=new_range[i+1]-1;
-          std::vector<int> s_cnt_ext(cmp_np, 0);
-          MPI_Sendrecv(                       NULL,                                                                       0, MPI_BYTE, partner, 0,
-                       &rbuff[rdisp_ext[new_np*i]], r_cnt_ext[new_np*(i+1)-1]+rdisp_ext[new_np*(i+1)-1]-rdisp_ext[new_np*i], MPI_BYTE, partner, 0, c, &status);
+        for(int j=0;j<(i_==0 || i_==kway/2?1:2);j++){
+          int i=(i_==0?i1:((j+my_block/i_)%2?i1:i2));
+          MPI_Status status;
+          int cmp_np=new_range[i+1]-new_range[i];
+          int partner=(new_pid<cmp_np?       new_range[i]+new_pid: new_range[i+1]-1) ;
+
+          int send_dsp     =sdisp[new_range[i  ]-new_range[0]  ];
+          int send_dsp_last=sdisp[new_range[i+1]-new_range[0]-1];
+          int send_cnt     =s_cnt[new_range[i+1]-new_range[0]-1]+send_dsp_last-send_dsp;
+
+//          double ttt=omp_get_wtime();
+//          MPI_Sendrecv(&sbuff[send_dsp], send_cnt>0?1:0, MPI_BYTE, partner, 0,
+//                       &rbuff[rdisp[new_np  * i ]], (r_cnt[new_np  *(i+1)-1]+rdisp[new_np  *(i+1)-1]-rdisp[new_np  * i ])>0?1:0, MPI_BYTE, partner, 0, c, &status);
+//          tt_wait[200*pid+t_indx]=omp_get_wtime()-ttt;
+//
+//          ttt=omp_get_wtime();
+          MPI_Sendrecv(&sbuff[send_dsp], send_cnt, MPI_BYTE, partner, 0,
+                       &rbuff[rdisp[new_np  * i ]], r_cnt[new_np  *(i+1)-1]+rdisp[new_np  *(i+1)-1]-rdisp[new_np  * i ], MPI_BYTE, partner, 0, c, &status);
+//          tt[200*pid+t_indx]=omp_get_wtime()-ttt;
+//          t_indx++;
+
+          //Handle extra communication.
+          if(pid==new_np-1 && cmp_np>new_np){
+            int partner=new_range[i+1]-1;
+            std::vector<int> s_cnt_ext(cmp_np, 0);
+            MPI_Sendrecv(                       NULL,                                                                       0, MPI_BYTE, partner, 0,
+                         &rbuff[rdisp_ext[new_np*i]], r_cnt_ext[new_np*(i+1)-1]+rdisp_ext[new_np*(i+1)-1]-rdisp_ext[new_np*i], MPI_BYTE, partner, 0, c, &status);
+          }
         }
-      }*/
+      }
+      /*/
       {
         MPI_Request* requests = new MPI_Request[4*kway];
         MPI_Status * statuses = new MPI_Status[4*kway];
@@ -489,7 +517,7 @@ namespace par {
           int partner=              new_range[i]+new_pid;
           if(partner<new_range[i+1]){
             MPI_Irecv(&rbuff    [rdisp    [new_np*i]], r_cnt    [new_np*(i+1)-1]+rdisp    [new_np*(i+1)-1]-rdisp    [new_np*i ], MPI_BYTE, partner, 0, c, &requests[commCnt]); commCnt++;
-	  }
+          }
 
           //Handle extra recv.
           if(new_pid==new_np-1 && cmp_np>new_np){
@@ -501,15 +529,15 @@ namespace par {
           MPI_Status status;
           int cmp_np=new_range[i+1]-new_range[i];
           int partner=(new_pid<cmp_np?  new_range[i]+new_pid: new_range[i+1]-1);
-	  int send_dsp     =sdisp[new_range[i  ]-new_range[0]  ];
-	  int send_dsp_last=sdisp[new_range[i+1]-new_range[0]-1];
-	  int send_cnt     =s_cnt[new_range[i+1]-new_range[0]-1]+send_dsp_last-send_dsp;
+          int send_dsp     =sdisp[new_range[i  ]-new_range[0]  ];
+          int send_dsp_last=sdisp[new_range[i+1]-new_range[0]-1];
+          int send_cnt     =s_cnt[new_range[i+1]-new_range[0]-1]+send_dsp_last-send_dsp;
           MPI_Issend (&sbuff[send_dsp], send_cnt, MPI_BYTE, partner, 0, c, &requests[commCnt]); commCnt++;
         }
         MPI_Waitall(commCnt, requests, statuses);
         delete[] requests;
         delete[] statuses;
-      }
+      }// */
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -602,7 +630,40 @@ namespace par {
     assert(blk_size-2*sizeof(int)<=r_cnt_[src_pid]*sizeof(T));
     memcpy(&rbuff_[rdisp_[src_pid]],buff_ptr[i]+2*sizeof(int),blk_size-2*sizeof(int));
   }
+/*
+  std::vector<double> tt_sum(4096*200,0);
+  std::vector<double> tt_wait_sum(4096*200,0);
+  MPI_Reduce(&tt[0], &tt_sum[0], 4096*200, MPI_DOUBLE, MPI_SUM, 0, c);
+  MPI_Reduce(&tt_wait[0], &tt_wait_sum[0], 4096*200, MPI_DOUBLE, MPI_SUM, 0, c);
 
+#define MAX_PROCS 4096
+
+  if(np==MAX_PROCS){
+    if(!pid) std::cout<<"Tw=[";
+    size_t j=0;
+    for(size_t i=0;i<200;i++){
+      for(j=0;j<MAX_PROCS;j++)
+        if(!pid) std::cout<<tt_wait_sum[j*200+i]<<' ';
+      if(!pid) std::cout<<";\n";
+      MPI_Barrier(c);
+    }
+    if(!pid) std::cout<<"];\n\n\n";
+  }
+
+  MPI_Barrier(c);
+
+  if(np==MAX_PROCS){
+    if(!pid) std::cout<<"Tc=[";
+    size_t j=0;
+    for(size_t i=0;i<200;i++){
+      for(j=0;j<MAX_PROCS;j++)
+        if(!pid) std::cout<<tt_sum[j*200+i]<<' ';
+      if(!pid) std::cout<<";\n";
+      MPI_Barrier(c);
+    }
+    if(!pid) std::cout<<"];\n\n\n";
+  }
+  // */
   //Free memory.
   if(sbuff   !=NULL) delete[] sbuff;
 #endif
@@ -2292,11 +2353,11 @@ namespace par {
 #ifdef _PROFILE_SORT
 			 	hyper_compute_splitters.start();
 #endif				
-				// std::vector<T> split_key = par::Sorted_approx_Select(arr_, kway-1, comm); // select kway-1 splitters 
+				std::vector<T> split_key = par::Sorted_approx_Select(arr_, kway-1, comm); // select kway-1 splitters 
 				std::vector<unsigned int> min_idx, max_idx;
 				std::vector<DendroIntL> splitter_ranks;
 				
-				std::vector<T> guess = par::Sorted_Sample_Select(arr_, kway-1, min_idx, max_idx, splitter_ranks, comm);
+				//std::vector<T> guess = par::Sorted_Sample_Select(arr_, kway-1, min_idx, max_idx, splitter_ranks, comm);
 #ifdef __DEBUG_PAR__				
 				if (!myrank) 
 				{
@@ -2319,7 +2380,7 @@ namespace par {
 					std::cout << std::endl;				
 				}
 #endif
-			  std::vector<T> split_key = Sorted_k_Select(arr_, min_idx, max_idx, splitter_ranks, guess, comm); 	
+			  //std::vector<T> split_key = Sorted_k_Select(arr_, min_idx, max_idx, splitter_ranks, guess, comm); 	
 					
 #ifdef __DEBUG_PAR__			
 				if (!myrank) 
@@ -3235,8 +3296,8 @@ namespace par {
       par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 			
 			//Determine splitters. O( log(N/p) + log(p) )        
-      int splt_count = (kway*1000*nelem)/totSize; 
-      if (npes>1000) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?kway:0);
+      int splt_count = (1000*kway*nelem)/totSize; 
+      if (npes>1000*kway) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*kway*nelem)?1:0);
       if (splt_count>nelem) splt_count=nelem;
       std::vector<T> splitters(splt_count);
       for(size_t i=0;i<splt_count;i++) 
@@ -3296,10 +3357,129 @@ namespace par {
 			return split_keys;
 		}	
 	
+  template<typename T>
+    void Sorted_approx_Select_helper(std::vector<T>& arr, std::vector<size_t>& exp_rank, std::vector<T>& splt_key, int beta, std::vector<size_t>& start, std::vector<size_t>& end, size_t& max_err, MPI_Comm comm) {
+      //int dbg_cnt=0; MPI_Barrier(comm);
+      //std::vector<double> tt(1000,-omp_get_wtime());
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
 
-		
+      int rank, npes;
+      MPI_Comm_size(comm, &npes);
+      MPI_Comm_rank(comm, &rank);
+      
+      size_t nelem=arr.size();
+      int kway=exp_rank.size();
+      std::vector<size_t> locSize(kway), totSize(kway);
+      for(int i=0;i<kway;i++) locSize[i]=end[i]-start[i];
+      par::Mpi_Allreduce<size_t>(&locSize[0], &totSize[0], kway, MPI_SUM, comm);
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+
+      //-------------------------------------------
+      std::vector<T> loc_splt;
+      for(int i=0;i<kway;i++){
+        int splt_count = (totSize[i]==0?1:(beta*(end[i]-start[i]))/totSize[i]);
+        if (npes>beta) splt_count = (((float)rand()/(float)RAND_MAX)*totSize[i]<(beta*locSize[i])?1:0);
+        for(int j=0;j<splt_count;j++) loc_splt.push_back(arr[start[i]+rand()%(locSize[i]+1)]);
+        std::sort(&loc_splt[loc_splt.size()-splt_count],&loc_splt[loc_splt.size()]);
+      }
+      //MPI_Comm comm_;
+      //MPI_Comm_split(comm, (loc_splt.size()>0?1:0), rank, &comm_);
+      //if(loc_splt.size()>0) bitonicSort<T>(loc_splt, comm_);
+      int splt_count=loc_splt.size();
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+      
+      // Gather all splitters. O( log(p) )
+      int glb_splt_count;
+      std::vector<int> glb_splt_cnts(npes);
+      std::vector<int> glb_splt_disp(npes,0);
+      par::Mpi_Allgather<int>(&splt_count, &glb_splt_cnts[0], 1, comm);
+      omp_par::scan(&glb_splt_cnts[0],&glb_splt_disp[0],npes);
+      glb_splt_count = glb_splt_cnts[npes-1] + glb_splt_disp[npes-1];
+      std::vector<T> glb_splt(glb_splt_count);
+      MPI_Allgatherv(&loc_splt[0], splt_count, par::Mpi_datatype<T>::value(), 
+                     &glb_splt[0], &glb_splt_cnts[0], &glb_splt_disp[0], par::Mpi_datatype<T>::value(), comm);
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+      std::sort(&glb_splt[0],&glb_splt[glb_splt_count]);
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+
+      // rank splitters. O( log(N/p) + log(p) )
+      std::vector<size_t> loc_rank(glb_splt_count,0);
+      if(nelem>0){
+        #pragma omp parallel for
+        for(size_t i=0; i<glb_splt_count; i++){
+          loc_rank[i] = std::lower_bound(&arr[0], &arr[nelem], glb_splt[i]) - &arr[0];
+        }
+      }
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+      std::vector<size_t> glb_rank(glb_splt_count, 0);
+      MPI_Allreduce(&loc_rank[0], &glb_rank[0], glb_splt_count, par::Mpi_datatype<size_t>::value(), MPI_SUM, comm);
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+
+      size_t new_max_err=0;
+      std::vector<T> split_keys(kway);
+      #pragma omp parallel for
+      for (int i=0; i<kway; i++) {
+        int ub_indx=std::upper_bound(&glb_rank[0], &glb_rank[glb_splt_count], exp_rank[i])-&glb_rank[0];
+        int lb_indx=ub_indx-1; if(lb_indx<0) lb_indx=0;
+        size_t err=labs(glb_rank[lb_indx]-exp_rank[i]);
+
+        if(err<max_err){
+          if(glb_rank[lb_indx]>exp_rank[i]) start[i]=0;
+          else start[i] = loc_rank[lb_indx];
+          if(ub_indx==glb_splt_count) end[i]=nelem;
+          else end[i] = loc_rank[ub_indx];
+          splt_key[i]=glb_splt[lb_indx];
+          if(new_max_err<err) new_max_err=err;
+        }
+      }
+      max_err=new_max_err;
+      //MPI_Barrier(comm); tt[dbg_cnt]+=omp_get_wtime(); dbg_cnt++; //////////////////////////////////////////////////////////////////////
+
+      //if(!rank && npes>=4096){
+      //  for(int i=1;i<dbg_cnt;i++) std::cout<<tt[i]-tt[i-1]<<' ';
+      //  std::cout<<'\n';
+      //}
+    }
+
+  template<typename T>
+    std::vector<T> Sorted_approx_Select(std::vector<T>& arr, unsigned int kway, MPI_Comm comm) {
+      int rank, npes;
+      MPI_Comm_size(comm, &npes);
+      MPI_Comm_rank(comm, &rank);
+      
+      //-------------------------------------------
+      DendroIntL totSize, nelem = arr.size(); 
+      par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
+
+      double tol=1e-2;
+      int beta=pow(1.0/tol,1.0/3.0)*3.0;
+      std::vector<T> splt_key(kway);
+      std::vector<size_t> start(kway,0);
+      std::vector<size_t> end(kway,nelem);
+      std::vector<size_t> exp_rank(kway);
+      for(int i=0;i<kway;i++) exp_rank[i]=((i+1)*totSize)/(kway+1);
+      
+      //MPI_Barrier(comm);
+      //double tt=omp_get_wtime();
+      //int iter_cnt=0;
+
+      size_t max_error=totSize;
+      while(max_error>totSize*tol){
+        //MPI_Barrier(comm);
+        //double tt=omp_get_wtime();
+        Sorted_approx_Select_helper(arr, exp_rank, splt_key, beta, start, end, max_error, comm);
+        //MPI_Barrier(comm);
+        //if(!rank) std::cout<<log(max_error*1.0/totSize)/log(0.1)<<' '<<omp_get_wtime()-tt<<'\n';
+        //iter_cnt++;
+      }
+
+      //MPI_Barrier(comm);
+      //if(!rank && npes>=4096) std::cout<<beta<<' '<<iter_cnt<<' '<<log(max_error*1.0/totSize)/log(0.1)<<' '<<omp_get_wtime()-tt<<'\n';
+      return splt_key;
+    }
+    
 	template<typename T>
-		std::vector<T> Sorted_approx_Select(std::vector<T>& arr, unsigned int kway, MPI_Comm comm) {
+		std::vector<T> Sorted_approx_Select_old(std::vector<T>& arr, unsigned int kway, MPI_Comm comm) {
 			int rank, npes;
       MPI_Comm_size(comm, &npes);
 			MPI_Comm_rank(comm, &rank);
@@ -3309,8 +3489,8 @@ namespace par {
       par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
 			
 			//Determine splitters. O( log(N/p) + log(p) )        
-      int splt_count = (kway*1000*nelem)/totSize; 
-      if (npes>1000) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*nelem)?kway:0);
+      int splt_count = (1000*kway*nelem)/totSize; 
+      if (npes>1000*kway) splt_count = (((float)rand()/(float)RAND_MAX)*totSize<(1000*kway*nelem)?1:0);
       if (splt_count>nelem) splt_count=nelem;
       std::vector<T> splitters(splt_count);
       for(size_t i=0;i<splt_count;i++) 
