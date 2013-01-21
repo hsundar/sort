@@ -2232,7 +2232,172 @@ namespace par {
 // */
 
   template<typename T>
-    int HyperQuickSort_kway(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_) { // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
+    int HyperQuickSort_kway(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_) {
+      total_sort.clear();
+      seq_sort.clear();
+      hyper_compute_splitters.clear();
+      hyper_communicate.clear();
+      hyper_merge.clear();
+      hyper_comm_split.clear();
+      sort_partitionw.clear();
+      MPI_Barrier(comm_);
+
+      PROF_SORT_BEGIN
+#ifdef _PROFILE_SORT
+      total_sort.start();
+#endif
+      unsigned int kway = KWAY;
+
+      // Copy communicator.
+      MPI_Comm comm=comm_;
+
+      // Get comm size and rank.
+      int npes, myrank;
+      MPI_Comm_size(comm, &npes);
+      MPI_Comm_rank(comm, &myrank);
+      srand(myrank);
+
+      // Local and global sizes. O(log p)
+      size_t totSize, nelem = arr.size(); assert(nelem);
+      par::Mpi_Allreduce<size_t>(&nelem, &totSize, 1, MPI_SUM, comm);
+      std::vector<T> arr_(nelem*2); //Extra buffer.
+      std::vector<T> arr__(nelem*2); //Extra buffer.
+
+      // Local sort.
+#ifdef _PROFILE_SORT
+      seq_sort.start();
+#endif
+      omp_par::merge_sort(&arr[0], &arr[arr.size()]);
+#ifdef _PROFILE_SORT
+      seq_sort.stop();
+#endif
+
+      while(npes>1 && totSize>0){
+        if(kway>npes) kway = npes;
+        int blk_size=npes/kway; assert(blk_size*kway==npes);
+        int blk_id=myrank/blk_size, new_pid=myrank%blk_size;
+
+        // Determine splitters.
+#ifdef _PROFILE_SORT
+        hyper_compute_splitters.start();
+#endif
+        std::vector<T> split_key = par::Sorted_approx_Select(arr, kway-1, comm);
+#ifdef _PROFILE_SORT
+        hyper_compute_splitters.stop();
+#endif
+
+        {// Communication
+#ifdef _PROFILE_SORT
+          hyper_communicate.start();
+#endif
+          // Determine send_size.
+          std::vector<int> send_size(kway), send_disp(kway+1); send_disp[0]=0; send_disp[kway]=arr.size();
+          for(int i=1;i<kway;i++) send_disp[i]=std::lower_bound(&arr[0], &arr[arr.size()], split_key[i-1])-&arr[0];
+          for(int i=0;i<kway;i++) send_size[i]=send_disp[i+1]-send_disp[i];
+
+          // Get recv_size.
+          int recv_iter=0;
+          std::vector<T*> recv_ptr(kway);
+          std::vector<size_t> recv_cnt(kway);
+          std::vector<int> recv_size(kway), recv_disp(kway+1,0);
+          for(int i_=0;i_<=kway/2;i_++){
+            int i1=(blk_id+i_)%kway;
+            int i2=(blk_id+kway-i_)%kway;
+            MPI_Status status;
+            for(int j=0;j<(i_==0 || i_==kway/2?1:2);j++){
+              int i=(i_==0?i1:((j+blk_id/i_)%2?i1:i2));
+              int partner=blk_size*i+new_pid;
+              MPI_Sendrecv(&send_size[     i   ], 1, MPI_INT, partner, 0,
+                           &recv_size[recv_iter], 1, MPI_INT, partner, 0, comm, &status);
+              recv_disp[recv_iter+1]=recv_disp[recv_iter]+recv_size[recv_iter];
+              recv_ptr[recv_iter]=&arr_[recv_disp[recv_iter]];
+              recv_cnt[recv_iter]=recv_size[recv_iter];
+              recv_iter++;
+            }
+          }
+
+          // Communicate data.
+          recv_iter=0;
+					int merg_indx=-4;
+          std::vector<MPI_Request> reqst(kway*2);
+          std::vector<MPI_Status> status(kway*2);
+          arr_ .resize(recv_disp[kway]);
+          arr__.resize(recv_disp[kway]);
+          for(int i_=0;i_<=kway/2;i_++){
+            int i1=(blk_id+i_)%kway;
+            int i2=(blk_id+kway-i_)%kway;
+            for(int j=0;j<(i_==0 || i_==kway/2?1:2);j++){
+              int i=(i_==0?i1:((j+blk_id/i_)%2?i1:i2));
+              int partner=blk_size*i+new_pid;
+              //MPI_Status status;
+              //MPI_Sendrecv(&arr [send_disp[     i   ]], send_size[     i   ], par::Mpi_datatype<T>::value(), partner, 0,
+              //             &arr_[recv_disp[recv_iter]], recv_size[recv_iter], par::Mpi_datatype<T>::value(), partner, 0, comm, &status);
+              par::Mpi_Irecv <T>(&arr_[recv_disp[recv_iter]], recv_size[recv_iter], partner, 1, comm, &reqst[recv_iter*2+0]);
+              par::Mpi_Issend<T>(&arr [send_disp[     i   ]], send_size[     i   ], partner, 1, comm, &reqst[recv_iter*2+1]);
+              //MPI_Waitall(2, &reqst[recv_iter*2], &status[recv_iter*2]);
+              recv_iter++;
+
+              merg_indx++;
+              if(merg_indx>0)
+              {// Merge.
+                MPI_Waitall(2, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
+                T* A=&arr_[0]; T* B=&arr__[0];
+                for(int s=2;merg_indx%s==0;s*=2){
+                  std::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
+                             &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]]);
+                  T* C=A; A=B; B=C; // Swap
+                }
+              }
+            }
+          }
+					// Merge remaining parts.
+          while(merg_indx<(int)kway){
+              merg_indx++;
+              if(merg_indx>0)
+              {// Merge.
+                MPI_Waitall(2, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
+                T* A=&arr_[0]; T* B=&arr__[0];
+                for(int s=2;merg_indx%s==0;s*=2){
+                  std::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
+                             &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]]);
+                  T* C=A; A=B; B=C; // Swap
+                }
+              }
+          }
+					{// Swap buffers.
+						int swap_cond=0;
+            for(int s=2;kway%s==0;s*=2) swap_cond++;
+						if(swap_cond%2==0) swap(arr,arr_);
+						else swap(arr,arr__);
+					}
+				}
+
+#ifdef _PROFILE_SORT
+				hyper_communicate.stop();
+				hyper_comm_split.start();
+#endif
+				{// Split comm. kway  O( log(p) ) ??
+    	     MPI_Comm scomm;
+      	   MPI_Comm_split(comm, blk_id, myrank, &scomm );
+					 if(comm!=comm_) MPI_Comm_free(&comm);
+        	 comm = scomm;
+			     MPI_Comm_size(comm, &npes);
+			     MPI_Comm_rank(comm, &myrank);
+    	  }
+#ifdef _PROFILE_SORT
+				hyper_comm_split.stop();
+#endif
+			}
+#ifdef _PROFILE_SORT
+		 	total_sort.stop();
+#endif
+			SortedElem=arr;
+
+      PROF_SORT_END
+    }
+
+  template<typename T>
+    int HyperQuickSort_kway_old(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm_) { // O( ((N/p)+log(p))*(log(N/p)+log(p)) ) 
 #ifdef __PROFILE_WITH_BARRIER__
       MPI_Barrier(comm);
 #endif
