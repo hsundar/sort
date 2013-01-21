@@ -2247,6 +2247,7 @@ namespace par {
       total_sort.start();
 #endif
       unsigned int kway = KWAY;
+      int omp_p=omp_get_max_threads();
 
       // Copy communicator.
       MPI_Comm comm=comm_;
@@ -2318,7 +2319,7 @@ namespace par {
 
           // Communicate data.
           recv_iter=0;
-					int merg_indx=-4;
+					int merg_indx=0;
           std::vector<MPI_Request> reqst(kway*2);
           std::vector<MPI_Status> status(kway*2);
           arr_ .resize(recv_disp[kway]);
@@ -2343,8 +2344,10 @@ namespace par {
                 MPI_Waitall(2, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
                 T* A=&arr_[0]; T* B=&arr__[0];
                 for(int s=2;merg_indx%s==0;s*=2){
-                  std::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
-                             &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]]);
+                  //std    ::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
+                  //               &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]]);
+                  omp_par::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
+                                 &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]],omp_p,std::less<T>());
                   T* C=A; A=B; B=C; // Swap
                 }
               }
@@ -2358,8 +2361,10 @@ namespace par {
                 MPI_Waitall(2, &reqst[(merg_indx-1)*2], &status[(merg_indx-1)*2]);
                 T* A=&arr_[0]; T* B=&arr__[0];
                 for(int s=2;merg_indx%s==0;s*=2){
-                  std::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
-                             &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]]);
+                  //std    ::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
+                  //               &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]]);
+                  omp_par::merge(&A[recv_disp[merg_indx-s/2]],&A[recv_disp[merg_indx    ]],
+                                 &A[recv_disp[merg_indx-s  ]],&A[recv_disp[merg_indx-s/2]], &B[recv_disp[merg_indx-s]],omp_p,std::less<T>());
                   T* C=A; A=B; B=C; // Swap
                 }
               }
