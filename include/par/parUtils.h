@@ -434,8 +434,11 @@ namespace par {
 		int	AdjustCommunicationPattern(std::vector<int>& send_sizes, std::vector<int>& send_partners, 
 					 												 std::vector<int>& recv_sizes, std::vector<int>& recv_partners, MPI_Comm comm) ;	
 				
-						
+	 template <typename T>
+     int bucketData(std::vector<T> &in, std::vector<T> splitters, std::vector<T>& out, MPI_Comm comm);
 		
+	 template <typename T>
+     int bucketDataAndWrite(std::vector<T> &in, std::vector<T> splitters, char* filename, MPI_Comm comm);
 
   /**
     @brief A parallel hyper quick sort implementation.

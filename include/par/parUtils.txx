@@ -3987,5 +3987,86 @@ namespace par {
 		
 		}
 
+
+    template <typename T>
+      int bucketData(std::vector<T> &in, std::vector<T>& splitters, std::vector<T>& out, MPI_Comm comm) {
+        int npes, myrank;
+        MPI_Comm_size(comm, &npes);
+        MPI_Comm_rank(comm, &myrank);
+      
+        // easier if data is locally sorted ...
+        omp_par::merge_sort(&in[0], &in[in.size()]);
+        
+        unsigned int k = splitters.size();
+       
+        // locally bin the data.
+        std::vector<int> bucket_size(k), bucket_disp(k+1); 
+        bucket_disp[0]=0; bucket_disp[k] = in.size();
+
+        for(int i=1; i<k; i++) bucket_disp[i] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
+        for(int i=0; i<k; i++) bucket_size[i] = bucket_disp[i+1] - bucket_disp[i];
+        
+        for (int i=0; i<k; i++) {
+          // load balance bucket i
+          std::vector<T> bucket(bucket_size[i]);
+          std::copy(&in[bucket_disp[i]], &in[bucket_disp[i+1]], bucket.begin() );
+          par::partitionW<T>(bucket, NULL, comm);
+
+          // write out ?
+          // char filename[256];
+          FILE* fp = fopen("/tmp/temp_array.dat", "wb");
+          fwrite(&in[0], sizeof(T), in.size(), fp);
+
+          fclose(fp);
+          // update
+          bucket.clear();
+          bucket_prev = bucket_disp;
+        }
+
+
+        return 0;
+      }
+
+    template <typename T>
+      int bucketDataAndWrite(std::vector<T> &in, std::vector<T> splitters, char* filename, MPI_Comm comm) {
+        int npes, myrank;
+        MPI_Comm_size(comm, &npes);
+        MPI_Comm_rank(comm, &myrank);
+      
+        // easier if data is locally sorted ...
+        omp_par::merge_sort(&in[0], &in[in.size()]);
+        
+        unsigned int k = splitters.size();
+       
+        // locally bin the data.
+        std::vector<int> bucket_size(k), bucket_disp(k+1); 
+        bucket_disp[0]=0; bucket_disp[k] = in.size();
+
+        for(int i=1; i<k; i++) bucket_disp[i] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
+        for(int i=0; i<k; i++) bucket_size[i] = bucket_disp[i+1] - bucket_disp[i];
+        
+        for (int i=0; i<k; i++) {
+          // load balance bucket i
+          std::vector<T> bucket(bucket_size[i]);
+          std::copy(&in[bucket_disp[i]], &in[bucket_disp[i+1]], bucket.begin() );
+          par::partitionW<T>(bucket, NULL, comm);
+
+          // write out ?
+          char fname[1024];
+          sprintf(fname, "%s_%03d.dat", filename, i);
+          FILE* fp = fopen(fname, "wb");
+          fwrite(&in[0], sizeof(T), in.size(), fp);
+
+          fclose(fp);
+          // update
+          bucket.clear();
+          bucket_prev = bucket_disp;
+        }
+
+
+        return 0;
+     }
+
+
 }//end namespace
 
