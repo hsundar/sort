@@ -4039,29 +4039,39 @@ namespace par {
         unsigned int k = splitters.size();
        
         // locally bin the data.
-        std::vector<int> bucket_size(k), bucket_disp(k+1); 
-        bucket_disp[0]=0; bucket_disp[k] = in.size();
+        std::vector<int> bucket_size(k+1), bucket_disp(k+2); 
+        bucket_disp[0]=0; bucket_disp[k+1] = in.size();
 
-        for(int i=1; i<k; i++) bucket_disp[i] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
-        for(int i=0; i<k; i++) bucket_size[i] = bucket_disp[i+1] - bucket_disp[i];
-        
-        for (int i=0; i<k; i++) {
+        for(int i=0; i<k; i++) bucket_disp[i+1] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
+        for(int i=0; i<k+1; i++) {
+          bucket_size[i] = bucket_disp[i+1] - bucket_disp[i];
+          // std::cout << myrank << " " << i << " " << bucket_size[i] << std::endl;
+        }
+
+        FILE* fp;
+        char fname[1024];
+        // std::vector<FILE*> handles(k+1);
+        for (int i=0; i<k+1; i++) {
           // load balance bucket i
           std::vector<T> bucket(bucket_size[i]);
           std::copy(&in[bucket_disp[i]], &in[bucket_disp[i+1]], bucket.begin() );
           par::partitionW<T>(bucket, NULL, comm);
 
           // write out ?
-          char fname[1024];
-          sprintf(fname, "%s_%03d.dat", filename, i);
-          FILE* fp = fopen(fname, "wb");
+          sprintf(fname, "%s_%d_%03d.dat", filename, myrank, i);
+          fp = fopen(fname, "wb");
           fwrite(&bucket[0], sizeof(T), bucket.size(), fp);
 
+          // handles[i] = fp;
           fclose(fp);
           // update
           bucket.clear();
         }
-
+        /*
+        for (int i=0; i<k+1; i++) {
+          fclose(handles[i]);
+        }
+        */
 
         return 0;
      }
