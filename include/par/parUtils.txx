@@ -4055,12 +4055,11 @@ namespace par {
           char fname[1024];
           sprintf(fname, "%s_%03d.dat", filename, i);
           FILE* fp = fopen(fname, "wb");
-          fwrite(&in[0], sizeof(T), in.size(), fp);
+          fwrite(&bucket[0], sizeof(T), bucket.size(), fp);
 
           fclose(fp);
           // update
           bucket.clear();
-          bucket_prev = bucket_disp;
         }
 
 
