@@ -17,6 +17,10 @@
 #include <cstring>
 #include "dendro.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <aio.h>
+
 #ifdef _PROFILE_SORT
   #include "sort_profiler.h"
 #endif
@@ -4048,9 +4052,16 @@ namespace par {
           // std::cout << myrank << " " << i << " " << bucket_size[i] << std::endl;
         }
 
+#if 0
         FILE* fp;
+#else
+        int fd;
+
+        // create the control block structure
+        // aiocb cb;
+
+#endif
         char fname[1024];
-        // std::vector<FILE*> handles(k+1);
         for (int i=0; i<k+1; i++) {
           // load balance bucket i
           std::vector<T> bucket(bucket_size[i]);
@@ -4059,19 +4070,31 @@ namespace par {
 
           // write out ?
           sprintf(fname, "%s_%d_%03d.dat", filename, myrank, i);
+#if 0          
           fp = fopen(fname, "wb");
           fwrite(&bucket[0], sizeof(T), bucket.size(), fp);
-
-          // handles[i] = fp;
           fclose(fp);
+#else
+          fd = open(fname, O_WRONLY | O_CREAT, S_IWUSR);
+          if (fd == -1) {
+            perror("File cannot be opened");
+            return EXIT_FAILURE;
+          }
+          /*
+          memset(&cb, 0, sizeof(aiocb));
+          
+          cb.aio_nbytes = SIZE_TO_READ;
+          cb.aio_fildes = fd;
+          cb.aio_offset = 0;
+          cb.aio_buf = &bucket[0];
+          */
+          
+          write(fd, &bucket[0], sizeof(T)*bucket.size() );
+          close (fd);
+#endif
           // update
           bucket.clear();
         }
-        /*
-        for (int i=0; i<k+1; i++) {
-          fclose(handles[i]);
-        }
-        */
 
         return 0;
      }
