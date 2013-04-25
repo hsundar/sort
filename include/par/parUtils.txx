@@ -17,6 +17,10 @@
 #include <cstring>
 #include "dendro.h"
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <aio.h>
+
 #ifdef _PROFILE_SORT
   #include "sort_profiler.h"
 #endif
@@ -4222,29 +4226,58 @@ namespace par {
         unsigned int k = splitters.size();
        
         // locally bin the data.
-        std::vector<int> bucket_size(k), bucket_disp(k+1); 
-        bucket_disp[0]=0; bucket_disp[k] = in.size();
+        std::vector<int> bucket_size(k+1), bucket_disp(k+2); 
+        bucket_disp[0]=0; bucket_disp[k+1] = in.size();
 
-        for(int i=1; i<k; i++) bucket_disp[i] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
-        for(int i=0; i<k; i++) bucket_size[i] = bucket_disp[i+1] - bucket_disp[i];
-        
-        for (int i=0; i<k; i++) {
+        for(int i=0; i<k; i++) bucket_disp[i+1] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
+        for(int i=0; i<k+1; i++) {
+          bucket_size[i] = bucket_disp[i+1] - bucket_disp[i];
+          // std::cout << myrank << " " << i << " " << bucket_size[i] << std::endl;
+        }
+
+#if 0
+        FILE* fp;
+#else
+        int fd;
+
+        // create the control block structure
+        // aiocb cb;
+
+#endif
+        char fname[1024];
+        for (int i=0; i<k+1; i++) {
           // load balance bucket i
           std::vector<T> bucket(bucket_size[i]);
           std::copy(&in[bucket_disp[i]], &in[bucket_disp[i+1]], bucket.begin() );
           par::partitionW<T>(bucket, NULL, comm);
 
           // write out ?
-          char fname[1024];
-          sprintf(fname, "%s_%03d.dat", filename, i);
-          FILE* fp = fopen(fname, "wb");
+          sprintf(fname, "%s_%d_%03d.dat", filename, myrank, i);
+#if 0          
+          fp = fopen(fname, "wb");
           fwrite(&bucket[0], sizeof(T), bucket.size(), fp);
-
           fclose(fp);
+#else
+          fd = open(fname, O_WRONLY | O_CREAT, S_IWUSR);
+          if (fd == -1) {
+            perror("File cannot be opened");
+            return EXIT_FAILURE;
+          }
+          /*
+          memset(&cb, 0, sizeof(aiocb));
+          
+          cb.aio_nbytes = SIZE_TO_READ;
+          cb.aio_fildes = fd;
+          cb.aio_offset = 0;
+          cb.aio_buf = &bucket[0];
+          */
+          
+          write(fd, &bucket[0], sizeof(T)*bucket.size() );
+          close (fd);
+#endif
           // update
           bucket.clear();
         }
-
 
         return 0;
      }

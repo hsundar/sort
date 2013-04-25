@@ -422,6 +422,8 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 }
 
 int main(int argc, char **argv){
+  
+  /*
   if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
@@ -436,7 +438,7 @@ int main(int argc, char **argv){
   }
 
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
-
+*/
   //Set number of OpenMP threads to use.
   int num_threads = atoi(argv[1]);
 	omp_set_num_threads(num_threads);
@@ -451,6 +453,34 @@ int main(int argc, char **argv){
   // Find out number of processes
   int p;
   MPI_Comm_size(MPI_COMM_WORLD, &p);
+
+  //!----------------------------------
+  // test buckets ... 
+  int nl = 1024*1024*100;
+  std::vector<int> qq(nl);
+  
+  srand(myrank*1713);
+  for (int i=0; i<nl; i++) {
+    qq[i] = rand();
+  }
+
+  omp_par::merge_sort(&qq[0], &qq[qq.size()]);
+
+  std::vector<int> sortBins = par::Sorted_approx_Select(qq, 9, MPI_COMM_WORLD);
+
+  if (!myrank) {
+    std::cout << "splitters = [" << std::endl;
+    for (int i=0; i<9; ++i) std::cout << sortBins[i] << " " << std::endl;;
+    std::cout << "]" << std::endl;
+  }
+  double t0 = omp_get_wtime();
+  par::bucketDataAndWrite(qq, sortBins, "/tmp/foo", MPI_COMM_WORLD);
+  double t1 = omp_get_wtime();
+
+  std::cout << myrank << ": all done in " << t1-t0 << std::endl;
+  MPI_Finalize();
+  return 0;
+  //!----------------------------------
 
   int proc_group=0;
   int min_np=1;
