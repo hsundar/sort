@@ -190,17 +190,18 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
 
   std::vector<Data_t> in_cpy(N);
   std::copy(in.begin(), in.end(), in_cpy.begin());
-  std::vector<Data_t> out;
+  // std::vector<Data_t> out;
 
 
   // if (!myrank) std::cout << "warmup sort" << std::endl;
   // Warmup run and verification.
-  SORT_FUNCTION<Data_t>(in, out, comm);
+  // SORT_FUNCTION<Data_t>(in, out, comm);
   // if (!myrank) std::cout << "finished warmup sort" << std::endl;
-  // SORT_FUNCTION<Data_t>(in_cpy, comm);
-  in=in_cpy;
+  SORT_FUNCTION<Data_t>(in_cpy, comm);
+  // in=in_cpy;
 #ifdef __VERIFY__
-  verify(in,out,comm);
+  verify(in,in_cpy,comm);
+	in_cpy.clear();
 #endif
   
 #ifdef _PROFILE_SORT
@@ -222,8 +223,8 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
   //Sort
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
-  SORT_FUNCTION<Data_t>(in, out, comm);
-  // SORT_FUNCTION<Data_t>(in, comm);
+  // SORT_FUNCTION<Data_t>(in, out, comm);
+  SORT_FUNCTION<Data_t>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
 
@@ -341,7 +342,10 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   std::vector<T> in_cpy=in;
   std::vector<T> out;
 
-	/*
+
+  // for(unsigned int i=0;i<N;i++) std::cout << in[i] << std::endl; 
+	
+  /*
 	unsigned int kway = 7;
 	DendroIntL Nglobal=p*N;
 	
@@ -451,8 +455,6 @@ int main(int argc, char **argv){
   int proc_group=0;
   int min_np=1;
   MPI_Comm comm;
-  for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
-  MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
 
   std::vector<double> tt(10000,0);
   
@@ -510,8 +512,12 @@ int main(int argc, char **argv){
       tt[100*k+0]=ttt;
     }
   }
-	// MPI_Finalize();
-  // return 0;m,
+	MPI_Finalize();
+  return 0;
+	
+  for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
+  MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
+	
 	{ // smaller /2^k runs 
     int myrank_;
     MPI_Comm_rank(comm, &myrank_);
