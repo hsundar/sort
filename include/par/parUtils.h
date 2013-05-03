@@ -404,7 +404,11 @@ namespace par {
 		std::vector<T> Sorted_Sample_Select(std::vector<T>& arr, unsigned int kway, std::vector<unsigned int>& min_idx, std::vector<unsigned int>& max_idx, std::vector<DendroIntL>& splitter_ranks, MPI_Comm comm);
 	template<typename T>
 		std::vector<T> Sorted_approx_Select(std::vector<T>& arr, unsigned int k, MPI_Comm comm);
-	template<typename T>
+	//! new one to handle skewed distributions ...
+  template<typename T>
+		std::vector<std::pair<T, DendroIntL> > Sorted_approx_Select_skewed(std::vector<T>& arr, unsigned int k, MPI_Comm comm);
+	
+  template<typename T>
 		std::vector<T> GetRangeMean(std::vector<T>& arr, std::vector<unsigned int> range_min, std::vector<unsigned int> range_max, MPI_Comm comm);
 	template<typename T>
 		std::vector<T> GuessRangeMedian(std::vector<T>& arr, std::vector<unsigned int> range_min, std::vector<unsigned int> range_max, MPI_Comm comm);
