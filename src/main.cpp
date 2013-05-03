@@ -163,7 +163,7 @@ bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
   for(long j=0;j<in.size();j++)
     if(in[j]!=out[j]){
       std::cout<<"Failed at:"<<j<<'\n';
-//      std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
+      // std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
       return false;
     }
 
@@ -200,8 +200,15 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
   SORT_FUNCTION<Data_t>(in_cpy, comm);
   // in=in_cpy;
 #ifdef __VERIFY__
-  verify(in,in_cpy,comm);
-	in_cpy.clear();
+  // verify(in,in_cpy,comm);
+	for (int i=1; i<in_cpy.size(); ++i) {
+    if (in_cpy[i-1] > in_cpy[i]) {
+      std::cout << "failed locally at " << i << "/" << in_cpy.size() << std::endl;
+      exit(1);
+    }
+  }
+  
+  in_cpy.clear();
 #endif
   
 #ifdef _PROFILE_SORT
@@ -339,7 +346,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 	}
   // for(unsigned int i=0;i<N;i++) in[i]=binOp::reversibleHash(myrank*i); 
   // std::cout << "finished generating data " << std::endl;
-  std::vector<T> in_cpy=in;
+  // std::vector<T> in_cpy=in;
   std::vector<T> out;
 
 
@@ -386,8 +393,11 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 	*/
 	
   // Warmup run and verification.
-  SORT_FUNCTION<T>(in, out, comm);
-  in=in_cpy;
+  out = in;
+  if (!myrank) std::cout << "Calling warmup sort" << std::endl;
+  SORT_FUNCTION<T>(out, comm);
+  if (!myrank) std::cout << "Done warmup sort" << std::endl;
+  // in=in_cpy;
   // SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
@@ -413,7 +423,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   //Sort
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
-  SORT_FUNCTION<T>(in, out, comm);
+  SORT_FUNCTION<T>(in, comm);
   // SORT_FUNCTION<T>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
@@ -423,7 +433,6 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 
 int main(int argc, char **argv){
   
-  /*
   if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
@@ -438,7 +447,6 @@ int main(int argc, char **argv){
   }
 
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
-*/
   //Set number of OpenMP threads to use.
   int num_threads = atoi(argv[1]);
 	omp_set_num_threads(num_threads);
@@ -454,6 +462,8 @@ int main(int argc, char **argv){
   int p;
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
+
+  /*
   //!----------------------------------
   // test buckets ... 
   int nl = 1024*1024*100;
@@ -481,6 +491,7 @@ int main(int argc, char **argv){
   MPI_Finalize();
   return 0;
   //!----------------------------------
+  */
 
   int proc_group=0;
   int min_np=1;

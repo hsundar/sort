@@ -17,6 +17,8 @@
 #include <cstring>
 #include "dendro.h"
 
+#include "indexHolder.h"
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <aio.h>
@@ -3078,8 +3080,8 @@ namespace par {
 			  PROF_SORT_END
       } 
 
-      std::vector<T>  splitters;
-      std::vector<T>  allsplitters;
+      // std::vector<T>  splitters;
+      // std::vector<T>  allsplitters;
 
       int myrank;
       MPI_Comm_rank(comm, &myrank);
@@ -3163,20 +3165,27 @@ namespace par {
 #ifdef _PROFILE_SORT
 			seq_sort.stop();
 #endif
-				
-      std::vector<T> sendSplits(npes-1);
-      splitters.resize(npes);
+      unsigned long idx; 
+      std::vector<IndexHolder<T> > sendSplits(npes-1);
+      std::vector< IndexHolder<T> >  splitters (npes);
+      // splitters.resize(npes);
 
       #pragma omp parallel for
-      for(int i = 1; i < npes; i++)         {
-        sendSplits[i-1] = arr[i*nelem/npes];        
+      for(int i = 1; i < npes; i++) {
+        idx = 2*myrank*nelem/npes + i*nelem/npes;
+        sendSplits[i-1] = IndexHolder<T> (arr[i*nelem/npes], idx);        
       }//end for i
 
 #ifdef _PROFILE_SORT
  		  sample_sort_splitters.start();
 #endif
-      // sort sendSplits using bitonic ...
-      par::bitonicSort<T>(sendSplits,comm);
+      //! sort sendSplits using bitonic ...
+      // std::cout << myrank << ": calling bitonic -- " << sendSplits.size() <<  std::endl;
+      par::bitonicSort< IndexHolder<T> >(sendSplits, comm);
+     
+      // if (!myrank)
+      std::cout << myrank << ": finished bitonic" << std::endl;
+
 #ifdef _PROFILE_SORT
  		  sample_sort_splitters.stop();
 #endif
@@ -3186,15 +3195,15 @@ namespace par {
 	 		sample_prepare_scatter.start();
 #endif				
       // All gather with last element of splitters.
-      T* sendSplitsPtr = NULL;
-      T* splittersPtr = NULL;
+      IndexHolder<T> *sendSplitsPtr = NULL;
+      IndexHolder<T> *splittersPtr = NULL;
       if(sendSplits.size() > static_cast<unsigned int>(npes-2)) {
         sendSplitsPtr = &(*(sendSplits.begin() + (npes -2)));
       }
       if(!splitters.empty()) {
         splittersPtr = &(*(splitters.begin()));
       }
-      par::Mpi_Allgather<T>(sendSplitsPtr, splittersPtr, 1, comm);
+      par::Mpi_Allgather<IndexHolder<T> >(sendSplitsPtr, splittersPtr, 1, comm);
 
       sendSplits.clear();
 
@@ -3225,34 +3234,37 @@ namespace par {
         #pragma omp parallel for
         for(int i=1;i<omp_p;i++){
           //proc_split[i] = seq::BinSearch(&splittersPtr[0],&splittersPtr[npes-1],arr[i*nelem/omp_p],std::less<T>());
-          proc_split[i] = std::upper_bound(&splittersPtr[0],&splittersPtr[npes-1],arr[i*(size_t)nelem/omp_p],std::less<T>())-&splittersPtr[0];
+          idx = 2*myrank*nelem/npes + i*(size_t)nelem/omp_p;
+          IndexHolder<T> key( arr[i*(size_t)nelem/omp_p], idx);
+          proc_split[i] = std::upper_bound( &splittersPtr[0], &splittersPtr[npes-1], key, std::less<IndexHolder<T> >())  - &splittersPtr[0];
           if(proc_split[i]<npes-1){
             //lst_split_indx[i]=seq::BinSearch(&arr[0],&arr[nelem],splittersPtr[proc_split[i]],std::less<T>());
-            lst_split_indx[i]=std::upper_bound(&arr[0],&arr[nelem],splittersPtr[proc_split[i]],std::less<T>())-&arr[0];
+            lst_split_indx[i] = std::upper_bound(&arr[0], &arr[nelem], splittersPtr[proc_split[i]].value , std::less<T>()) - &arr[0];
           }else{
-            proc_split[i]=npes-1;
-            lst_split_indx[i]=nelem;
+            proc_split[i]     = npes-1;
+            lst_split_indx[i] = nelem;
           }
         }
+        idx = 2*myrank*nelem/npes;
         #pragma omp parallel for
         for (int i=0;i<omp_p;i++){
           int sendcnts_=0;
           int k=proc_split[i];
           for (DendroIntL j = lst_split_indx[i]; j < lst_split_indx[i+1]; j++) {
-            if (arr[j] <= splitters[k]) {
+            if ( IndexHolder<T>(arr[j],idx+j) <= splitters[k]) {
               sendcnts_++;
             } else{
               if(sendcnts_>0)
                 sendcnts[k]=sendcnts_;
               sendcnts_=0;
-              k = seq::UpperBound<T>(npes-1, splittersPtr, k+1, arr[j]);
+              k = seq::UpperBound< IndexHolder<T> >(npes-1, splittersPtr, k+1, IndexHolder<T>(arr[j],idx+j) );
               if (k == (npes-1) ){
                 //could not find any splitter >= arr[j]
                 sendcnts_ = (nelem - j);
                 break;
               } else {
                 assert(k < (npes-1));
-                assert(splitters[k] >= arr[j]);
+                assert(splitters[k].value >= arr[j]);
                 sendcnts_++;
               }
             }//end if-else
@@ -3648,10 +3660,16 @@ namespace par {
 
       // first communicate how many you will send and how many you will receive ...
 
+      int       my_rank;
+      MPI_Comm_rank(comm, &my_rank);
+
       par::Mpi_Sendrecv<int, int>( &send_size , 1, partner, 0,
           &recv_size, 1, partner, 0, comm, &status);
 
-      std::vector<T> temp_list( recv_size );
+      // if (!my_rank || my_rank==2)
+      // std::cout << my_rank << " <--> " << partner << "  -> " << send_size << " <- " << recv_size << std::endl;
+      
+      std::vector<T> temp_list( recv_size, local_list[0] );
 
       T* local_listPtr = NULL;
       T* temp_listPtr = NULL;
@@ -3662,11 +3680,28 @@ namespace par {
         temp_listPtr = &(*(temp_list.begin()));
       }
 
+      /*
+      if (!my_rank || my_rank==1)
+      for (int i=0; i<send_size; ++i) {
+        std::cout << my_rank << "--sending-->" << local_listPtr[i] << std::endl;
+      }
+      */
+
+      // std::cout << "SendRecv" << std::endl;
       par::Mpi_Sendrecv<T, T>( local_listPtr, send_size, partner,
           1, temp_listPtr, recv_size, partner, 1, comm, &status);
 
+      /*
+      if (!my_rank || my_rank==1)
+      for (int i=0; i<recv_size; ++i) {
+        std::cout << my_rank << "<--recv--" << temp_listPtr[i] << std::endl;
+      }
+      */
+
+      // std::cout << my_rank << ": before merge -- " << local_list.size() << ", " << temp_list.size() << std::endl;
       MergeLists<T>(local_list, temp_list, which_keys);
 
+      // std::cout << my_rank << ": after merge -- " << local_list.size() << ", " << temp_list.size() << std::endl;
       temp_list.clear();
     } // Merge_split 
 
@@ -3688,8 +3723,12 @@ namespace par {
       }
 
       eor_bit = (1 << (proc_set_dim - 1) );
+      
+      if (!my_rank) std::cout << "bitonic - incr " << proc_set_dim << std::endl;
       for (stage = 0; stage < proc_set_dim; stage++) {
         partner = (my_rank ^ eor_bit);
+      
+        // std::cout << my_rank << " : bitonic incr -- " << stage << std::endl;
 
         if (my_rank < partner) {
           MergeSplit<T> ( local_list,  KEEP_LOW, partner, comm);
@@ -3720,9 +3759,13 @@ namespace par {
       }
 
       eor_bit = (1 << (proc_set_dim - 1));
+      
+      if (!my_rank) std::cout << "bitonic - decr " << proc_set_dim << std::endl;
       for (stage = 0; stage < proc_set_dim; stage++) {
         partner = my_rank ^ eor_bit;
 
+        // std::cout << my_rank << " : bitonic decr -- " << stage << std::endl;
+        
         if (my_rank > partner) {
           MergeSplit<T> ( local_list,  KEEP_LOW, partner, comm);
         } else {
@@ -3799,6 +3842,9 @@ namespace par {
       //Local Sort first
       //std::sort(in.begin(),in.end());
       omp_par::merge_sort(&in[0],&in[in.size()]);
+      MPI_Barrier(comm);
+      if (!rank)
+        std::cout << "bitonic - finished local sort" << std::endl;
 
       if(npes > 1) {
 
@@ -3806,6 +3852,8 @@ namespace par {
         bool isPower = (!(npes & (npes - 1)));
 
         if ( isPower ) {
+          if (!rank)
+            std::cout << "bitonic - calling bitonic binary" << std::endl;
           bitonicSort_binary<T>(in, comm);
         } else {
           MPI_Comm new_comm;
@@ -3841,6 +3889,8 @@ namespace par {
     void MergeLists( std::vector<T> &listA, std::vector<T> &listB,
         int KEEP_WHAT) {
 
+      // std::cout << "IN MergeLists" << std::endl;
+
       T _low, _high;
 
       assert(!(listA.empty()));
@@ -3850,8 +3900,12 @@ namespace par {
       _high = ( (listA[listA.size()-1] < listB[listB.size()-1]) ?
           listA[listA.size()-1] : listB[listB.size()-1]);
 
+      // std::cout << "low -- " << _low << "high -- "<< _high << std::endl;
+
       // We will do a full merge first ...
       size_t list_size = listA.size() + listB.size();
+      
+      // std::cout << listA.size() << " + " << listB.size() << " = " << list_size << std::endl; 
 
       std::vector<T> scratch_list(list_size);
 
@@ -3861,15 +3915,15 @@ namespace par {
       for (size_t i = 0; i < list_size; i++) {
         //The order of (A || B) is important here, 
         //so that index2 remains within bounds
-        if ( (index1 < listA.size()) && 
-            ( (index2 >= listB.size()) ||
-              (listA[index1] <= listB[index2]) ) ) {
+        if ( (index1 < listA.size()) && ( (index2 >= listB.size()) || (listA[index1] <= listB[index2]) ) ) {
           scratch_list[i] = listA[index1];
           index1++;
         } else {
           scratch_list[i] = listB[index2];
           index2++;        
         }
+
+        // std::cout << "scratch--" << scratch_list[i] << std::endl;
       }
 
       //Scratch list is sorted at this point.
@@ -3878,11 +3932,10 @@ namespace par {
       listB.clear();
       if ( KEEP_WHAT == KEEP_LOW ) {
         int ii=0;
-        while ( ( (scratch_list[ii] < _low) ||
-              (ii < (list_size/2)) )
-            && (scratch_list[ii] <= _high) ) {
+        while ( ( (scratch_list[ii] < _low) || (ii < (list_size/2)) ) && (scratch_list[ii] <= _high) ) {
           ii++;        
         }
+        // std::cout << "Keep Low : " << ii << std::endl;
         if(ii) {
           listA.insert(listA.end(), scratch_list.begin(),
               (scratch_list.begin() + ii));
@@ -3894,6 +3947,7 @@ namespace par {
             || (scratch_list[ii] > _high) ) {
           ii--;        
         }
+        // std::cout << "Keep high : " << ii << std::endl;
         if(ii < (list_size - 1) ) {
           listA.insert(listA.begin(), (scratch_list.begin() + (ii + 1)),
               (scratch_list.begin() + list_size));
