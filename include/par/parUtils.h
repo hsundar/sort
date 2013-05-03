@@ -477,6 +477,8 @@ namespace par {
   template<typename T>
     int sampleSort(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 
+  template<typename T>
+    int sampleSort(std::vector<T>& in, MPI_Comm comm); 
   /**
     @brief Removes duplicates in parallel. If the input is not sorted, sample sort will be called 
     within the function to sort the vector and then duplicates will be removed.
