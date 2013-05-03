@@ -444,6 +444,8 @@ namespace par {
 	 template <typename T>
      int bucketDataAndWrite(std::vector<T> &in, std::vector<T> splitters, char* filename, MPI_Comm comm);
 
+	 template <typename T>
+     int bucketDataAndWriteSkewed (std::vector<T> &in, std::vector< std::pair<T, DendroIntL> > splitters, char* filename, MPI_Comm comm);
   /**
     @brief A parallel hyper quick sort implementation.
     @author Dhairya Malhotra

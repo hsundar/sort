@@ -3184,7 +3184,7 @@ namespace par {
       par::bitonicSort< IndexHolder<T> >(sendSplits, comm);
      
       // if (!myrank)
-      std::cout << myrank << ": finished bitonic" << std::endl;
+      // std::cout << myrank << ": finished bitonic" << std::endl;
 
 #ifdef _PROFILE_SORT
  		  sample_sort_splitters.stop();
@@ -3724,7 +3724,7 @@ namespace par {
 
       eor_bit = (1 << (proc_set_dim - 1) );
       
-      if (!my_rank) std::cout << "bitonic - incr " << proc_set_dim << std::endl;
+      // if (!my_rank) std::cout << "bitonic - incr " << proc_set_dim << std::endl;
       for (stage = 0; stage < proc_set_dim; stage++) {
         partner = (my_rank ^ eor_bit);
       
@@ -3760,7 +3760,7 @@ namespace par {
 
       eor_bit = (1 << (proc_set_dim - 1));
       
-      if (!my_rank) std::cout << "bitonic - decr " << proc_set_dim << std::endl;
+      // if (!my_rank) std::cout << "bitonic - decr " << proc_set_dim << std::endl;
       for (stage = 0; stage < proc_set_dim; stage++) {
         partner = my_rank ^ eor_bit;
 
@@ -3843,8 +3843,9 @@ namespace par {
       //std::sort(in.begin(),in.end());
       omp_par::merge_sort(&in[0],&in[in.size()]);
       MPI_Barrier(comm);
-      if (!rank)
-        std::cout << "bitonic - finished local sort" << std::endl;
+      
+      // if (!rank)
+      //  std::cout << "bitonic - finished local sort" << std::endl;
 
       if(npes > 1) {
 
@@ -3852,8 +3853,8 @@ namespace par {
         bool isPower = (!(npes & (npes - 1)));
 
         if ( isPower ) {
-          if (!rank)
-            std::cout << "bitonic - calling bitonic binary" << std::endl;
+          //if (!rank)
+          //  std::cout << "bitonic - calling bitonic binary" << std::endl;
           bitonicSort_binary<T>(in, comm);
         } else {
           MPI_Comm new_comm;
@@ -4293,7 +4294,7 @@ namespace par {
             DendroIntL sRank = glb_dup_ranks[i]*npes/2/totSize;
             if (sRank < rank ) {
               disp[i] = dLow;
-            } else if (srank > rank) {
+            } else if (sRank > rank) {
               disp[i] = dHigh;
             } else {
               disp[i] = glb_dup_ranks[i] - (2*rank*totSize/npes);
@@ -4643,6 +4644,89 @@ namespace par {
 
         return 0;
       }
+
+	 template <typename T>
+     int bucketDataAndWriteSkewed (std::vector<T> &in, std::vector< std::pair<T, DendroIntL> > splitters, char* filename, MPI_Comm comm) {
+        int npes, myrank;
+        MPI_Comm_size(comm, &npes);
+        MPI_Comm_rank(comm, &myrank);
+      
+        DendroIntL totSize, nelem = in.size(); 
+        par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
+        
+        // easier if data is locally sorted ...
+        omp_par::merge_sort(&in[0], &in[in.size()]);
+
+        unsigned int k = splitters.size();
+       
+        // locally bin the data.
+        std::vector<int> bucket_size(k+1), bucket_disp(k+2); 
+        bucket_disp[0]=0; bucket_disp[k+1] = in.size();
+
+
+        DendroIntL dLow, dHigh, dMid;
+        for(size_t i=0; i<k; i++){
+          // disp[i] = std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
+          // bucket_disp[i+1] = std::lower_bound(&in[0], &in[in.size()], splitters[i]) - &in[0];
+          dLow = std::lower_bound(&in[0], &in[in.size()], splitters[i].first ) - &in[0];
+          dHigh = std::upper_bound(&in[0], &in[in.size()], splitters[i].first ) - &in[0];
+          if ( (dHigh-dLow) > 1 ) {
+            DendroIntL sRank = splitters[i].second * npes/2/totSize;
+            
+            if (sRank < myrank ) {
+              bucket_disp[i] = dLow;
+            } else if (sRank > myrank) {
+              bucket_disp[i] = dHigh;
+            } else {
+              dMid = splitters[i].second - (2*myrank*totSize/npes);
+              if ( (dMid >= dLow) && (dMid <= dHigh) )
+                bucket_disp[i] = dMid;
+              else
+                bucket_disp[i] = (dLow + dHigh)/2;
+            }
+          } else {
+            bucket_disp[i] = dLow;
+          }
+        }
+
+        for(int i=0; i<k+1; i++) bucket_size[i] = bucket_disp[i+1] - bucket_disp[i]; 
+
+#if 0
+        FILE* fp;
+#else
+        int fd;
+
+#endif
+        char fname[1024];
+        for (int i=0; i<k+1; i++) {
+          // load balance bucket i
+          std::vector<T> bucket(bucket_size[i]);
+          std::copy(&in[bucket_disp[i]], &in[bucket_disp[i+1]], bucket.begin() );
+          par::partitionW<T>(bucket, NULL, comm);
+
+          // write out ?
+          sprintf(fname, "%s_%d_%03d.dat", filename, myrank, i);
+#if 0          
+          fp = fopen(fname, "wb");
+          fwrite(&bucket[0], sizeof(T), bucket.size(), fp);
+          fclose(fp);
+#else
+          fd = open(fname, O_WRONLY | O_CREAT, S_IWUSR);
+          if (fd == -1) {
+            perror("File cannot be opened");
+            return EXIT_FAILURE;
+          }
+          
+          write(fd, &bucket[0], sizeof(T)*bucket.size() );
+          close (fd);
+#endif
+          // update
+          bucket.clear();
+        }
+
+        return 0;
+
+     }
 
     template <typename T>
       int bucketDataAndWrite(std::vector<T> &in, std::vector<T> splitters, char* filename, MPI_Comm comm) {

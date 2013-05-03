@@ -1,3 +1,4 @@
+#include <mpi.h>
 #include <iomanip>
 #include <cstdio>
 #include <cstdlib>
@@ -163,7 +164,7 @@ bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
   for(long j=0;j<in.size();j++)
     if(in[j]!=out[j]){
       std::cout<<"Failed at:"<<j<<'\n';
-      // std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
+//      std::cout<<"Failed at:"<<j<<"; in="<<in[j]<<" out="<<out[j]<<'\n';
       return false;
     }
 
@@ -188,26 +189,18 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
 
   // if (!myrank) std::cout << "created records" << std::endl;
 
-  std::vector<Data_t> in_cpy(N);
-  std::copy(in.begin(), in.end(), in_cpy.begin());
+  // std::vector<Data_t> in_cpy(N);
+  // std::copy(in.begin(), in.end(), in_cpy.begin());
   // std::vector<Data_t> out;
 
 
-  // if (!myrank) std::cout << "warmup sort" << std::endl;
+  if (!myrank) std::cout << "starting sort" << std::endl;
   // Warmup run and verification.
   // SORT_FUNCTION<Data_t>(in, out, comm);
-  // if (!myrank) std::cout << "finished warmup sort" << std::endl;
-  SORT_FUNCTION<Data_t>(in_cpy, comm);
+  // SORT_FUNCTION<Data_t>(in_cpy, comm);
   // in=in_cpy;
 #ifdef __VERIFY__
-  // verify(in,in_cpy,comm);
-	for (int i=1; i<in_cpy.size(); ++i) {
-    if (in_cpy[i-1] > in_cpy[i]) {
-      std::cout << "failed locally at " << i << "/" << in_cpy.size() << std::endl;
-      exit(1);
-    }
-  }
-  
+  verify(in,in_cpy,comm);
   in_cpy.clear();
 #endif
   
@@ -228,11 +221,18 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
 #endif
 		
   //Sort
-  MPI_Barrier(comm);
+  // MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
   // SORT_FUNCTION<Data_t>(in, out, comm);
+  // if (!myrank) std::cout << "finished sort" << std::endl;
+  // printf("%03d -- finished sort\n", myrank);
+  // std::cout << std::endl;
   SORT_FUNCTION<Data_t>(in, comm);
+  
+  if (!myrank) std::cout << "finished sort " << std::endl;
   MPI_Barrier(comm);
+  if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
+  
   wtime+=omp_get_wtime();
 
   return wtime;
@@ -346,13 +346,10 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 	}
   // for(unsigned int i=0;i<N;i++) in[i]=binOp::reversibleHash(myrank*i); 
   // std::cout << "finished generating data " << std::endl;
-  // std::vector<T> in_cpy=in;
+  std::vector<T> in_cpy=in;
   std::vector<T> out;
 
-
-  // for(unsigned int i=0;i<N;i++) std::cout << in[i] << std::endl; 
-	
-  /*
+	/*
 	unsigned int kway = 7;
 	DendroIntL Nglobal=p*N;
 	
@@ -393,11 +390,8 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 	*/
 	
   // Warmup run and verification.
-  out = in;
-  if (!myrank) std::cout << "Calling warmup sort" << std::endl;
-  SORT_FUNCTION<T>(out, comm);
-  if (!myrank) std::cout << "Done warmup sort" << std::endl;
-  // in=in_cpy;
+  SORT_FUNCTION<T>(in, out, comm);
+  in=in_cpy;
   // SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
@@ -423,7 +417,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   //Sort
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
-  SORT_FUNCTION<T>(in, comm);
+  SORT_FUNCTION<T>(in, out, comm);
   // SORT_FUNCTION<T>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
@@ -433,6 +427,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 
 int main(int argc, char **argv){
   
+  /*
   if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
@@ -445,8 +440,10 @@ int main(int argc, char **argv){
 		std::cerr << "\t\t typeDistrib can be UNIF, GAUSS, ZIPF." << std::endl;
     return 1;  
   }
+  */
 
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
+
   //Set number of OpenMP threads to use.
   int num_threads = atoi(argv[1]);
 	omp_set_num_threads(num_threads);
@@ -462,36 +459,74 @@ int main(int argc, char **argv){
   int p;
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
-
-  /*
   //!----------------------------------
+ 
+  // 1. read in file corresponding to the node % 100;
+  // 2. select splitters ... 5 - 20 - print ...
+  // 3. bucket and write ... with num_spliters = 20;
+
+
+
+  if (!myrank) std::cout << myrank << ": reading file" << std::endl;
+  char fname[256];
+  // sprintf(fname, "/scratch/01903/hsundar/from_karl/input/part%d", myrank%100);
+  sprintf(fname, "/scratch/00161/karl/sort_input/1-stripe/10_tb_skewed/part%d", myrank);
+  FILE* fp = fopen(fname, "rb");
+
+  long lSize;
+  size_t result;
+  fseek (fp , 0 , SEEK_END);
+  lSize = ftell (fp);
+  rewind (fp);
+
   // test buckets ... 
-  int nl = 1024*1024*100;
-  std::vector<int> qq(nl);
+  int nl = lSize/100; 
+  std::vector<sortRecord> qq(nl), out;
   
+  // printf("%d: read size is %ld\n", myrank, lSize);
+  /*
   srand(myrank*1713);
   for (int i=0; i<nl; i++) {
     qq[i] = rand();
   }
+  */
+  result = fread ( &(*qq.begin()), 1, lSize, fp);
+  if (result != lSize) { std::cerr << myrank << ": Reading error" << std::endl; exit (3);}
+  fclose (fp);
+  if (!myrank) std::cout << myrank << ": finished reading file" << std::endl;
 
   omp_par::merge_sort(&qq[0], &qq[qq.size()]);
 
-  std::vector<int> sortBins = par::Sorted_approx_Select(qq, 9, MPI_COMM_WORLD);
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (!myrank) std::cout << myrank << ": starting approx Select" << std::endl;
+  
+  std::vector<std::pair<sortRecord, DendroIntL> > sortBins = par::Sorted_approx_Select_skewed(qq, 9, MPI_COMM_WORLD);
 
+  if (!myrank) std::cout << myrank << ": finished approx Select" << std::endl;
+  /*
   if (!myrank) {
     std::cout << "splitters = [" << std::endl;
     for (int i=0; i<9; ++i) std::cout << sortBins[i] << " " << std::endl;;
     std::cout << "]" << std::endl;
   }
+  */
+  
   double t0 = omp_get_wtime();
-  par::bucketDataAndWrite(qq, sortBins, "/tmp/foo", MPI_COMM_WORLD);
+  par::bucketDataAndWriteSkewed(qq, sortBins, "/tmp/foo", MPI_COMM_WORLD);
   double t1 = omp_get_wtime();
-
+  
+  /*
+  double t0 = omp_get_wtime();
+  // par::HyperQuickSort(qq, out, MPI_COMM_WORLD);
+  par::sampleSort(qq, MPI_COMM_WORLD);
+  double t1 = omp_get_wtime();
+*/
   std::cout << myrank << ": all done in " << t1-t0 << std::endl;
+  
+  
   MPI_Finalize();
   return 0;
   //!----------------------------------
-  */
 
   int proc_group=0;
   int min_np=1;
@@ -553,13 +588,14 @@ int main(int argc, char **argv){
       tt[100*k+0]=ttt;
     }
   }
-	MPI_Finalize();
-  return 0;
-	
+
+	// MPI_Finalize();
+  // return 0;
+  
   for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
   MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
 	
-	{ // smaller /2^k runs 
+  { // smaller /2^k runs 
     int myrank_;
     MPI_Comm_rank(comm, &myrank_);
     double ttt;
@@ -621,8 +657,8 @@ int main(int argc, char **argv){
 
   // Shut down MPI 
   MPI_Finalize();
-  return 0;
-}
+   return 0;
+ }
 
 void printResults(int num_threads, MPI_Comm comm) {
 	int myrank, p, simd_width=0;
