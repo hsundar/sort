@@ -4260,9 +4260,10 @@ namespace par {
       std::vector<DendroIntL> dup_ranks(splt_count); 
       for(size_t i=0;i<splt_count;i++) {
         dup_ranks[i] = (2*i*totSize/npes) + rand()%nelem;
-        splitters[i] = arr[ dup_ranks[i] ];
+        splitters[i] =  arr[rand()%nelem];
       }
 
+      // std::cout << rank << ": got splitters and indices " << std::endl;
       // Gather all splitters. O( log(p) )
       int glb_splt_count;
       std::vector<int> glb_splt_cnts(npes);
@@ -4281,6 +4282,8 @@ namespace par {
                      &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
                      par::Mpi_datatype<T>::value(), comm);
 
+
+      // std::cout << rank << ": ranking splitters " << std::endl;
       // rank splitters. O( log(N/p) + log(p) )
       std::vector<DendroIntL> disp(glb_splt_count, 0);
       DendroIntL dLow, dHigh;
@@ -4306,6 +4309,7 @@ namespace par {
       }
       std::vector<DendroIntL> glb_disp(glb_splt_count, 0);
      
+      // std::cout << rank << ": all reduce " << std::endl;
       MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
         
 	    std::vector< std::pair<T, DendroIntL> > split_keys(kway);
@@ -4326,6 +4330,7 @@ namespace par {
         split_keys[qq]  = key_pair; // 
 			}
 			
+      // std::cout << rank << ": all done" << std::endl;
 			return split_keys;
 		}	
 
@@ -4663,6 +4668,7 @@ namespace par {
         std::vector<int> bucket_size(k+1), bucket_disp(k+2); 
         bucket_disp[0]=0; bucket_disp[k+1] = in.size();
 
+        // std::cout << myrank << ": starting local binning" << std::endl;
 
         DendroIntL dLow, dHigh, dMid;
         for(size_t i=0; i<k; i++){
@@ -4674,18 +4680,18 @@ namespace par {
             DendroIntL sRank = splitters[i].second * npes/2/totSize;
             
             if (sRank < myrank ) {
-              bucket_disp[i] = dLow;
+              bucket_disp[i+1] = dLow;
             } else if (sRank > myrank) {
-              bucket_disp[i] = dHigh;
+              bucket_disp[i+1] = dHigh;
             } else {
               dMid = splitters[i].second - (2*myrank*totSize/npes);
               if ( (dMid >= dLow) && (dMid <= dHigh) )
-                bucket_disp[i] = dMid;
+                bucket_disp[i+1] = dMid;
               else
-                bucket_disp[i] = (dLow + dHigh)/2;
+                bucket_disp[i+1] = (dLow + dHigh)/2;
             }
           } else {
-            bucket_disp[i] = dLow;
+            bucket_disp[i+1] = dLow;
           }
         }
 

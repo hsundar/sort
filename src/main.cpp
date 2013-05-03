@@ -470,7 +470,7 @@ int main(int argc, char **argv){
   if (!myrank) std::cout << myrank << ": reading file" << std::endl;
   char fname[256];
   // sprintf(fname, "/scratch/01903/hsundar/from_karl/input/part%d", myrank%100);
-  sprintf(fname, "/scratch/00161/karl/sort_input/1-stripe/10_tb_skewed/part%d", myrank);
+  sprintf(fname, "part%d", myrank);
   FILE* fp = fopen(fname, "rb");
 
   long lSize;
