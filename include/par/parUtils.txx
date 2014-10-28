@@ -1965,7 +1965,7 @@ namespace par {
           
           std::vector<T> splitters(splt_count);
           for(size_t i=0;i<splt_count;i++) 
-            splitters[i]=arr_[rand()%nelem];
+            splitters[i]=arr[rand()%nelem];
 					/* Fisher-Yates shuffle
           unsigned int j;
           for (size_t i=0; i<splt_count; i++) 
@@ -3166,8 +3166,12 @@ namespace par {
 			seq_sort.stop();
 #endif
       unsigned long idx; 
-      std::vector<IndexHolder<T> > sendSplits(npes-1);
-      std::vector< IndexHolder<T> >  splitters (npes);
+      // std::vector<IndexHolder<T> > sendSplits(npes-1);
+      std::vector< IndexHolder<T> >  splitters;
+      std::vector< std::pair<T, DendroIntL> >  splitters_pair = par::Sorted_approx_Select_skewed( arr, npes-1, comm);
+      
+
+      /*
       // splitters.resize(npes);
 
       #pragma omp parallel for
@@ -3175,6 +3179,7 @@ namespace par {
         idx = 2*myrank*nelem/npes + i*nelem/npes;
         sendSplits[i-1] = IndexHolder<T> (arr[i*nelem/npes], idx);        
       }//end for i
+      a
 
 #ifdef _PROFILE_SORT
  		  sample_sort_splitters.start();
@@ -3204,8 +3209,25 @@ namespace par {
         splittersPtr = &(*(splitters.begin()));
       }
       par::Mpi_Allgather<IndexHolder<T> >(sendSplitsPtr, splittersPtr, 1, comm);
-
       sendSplits.clear();
+      */
+      
+      for (int i=0; i<splitters_pair.size(); ++i) {
+        splitters.push_back ( IndexHolder<T> ( splitters_pair[i].first, splitters_pair[i].second ) );
+      }
+
+      T key_last;
+      DendroIntL zero = 0;
+      MPI_Bcast (&key_last, 1, par::Mpi_datatype<T>::value(), npes-1, comm);
+
+      splitters.push_back( IndexHolder<T>(key_last, zero) );
+      
+      omp_par::merge_sort(&splitters[0], &splitters[splitters.size()]);
+      
+      IndexHolder<T> *splittersPtr = NULL;
+      if(!splitters.empty()) {
+        splittersPtr = &(*(splitters.begin()));
+      }
 
       int *sendcnts = new int[npes];
       assert(sendcnts);
@@ -4559,7 +4581,7 @@ namespace par {
 
 
 		template<typename T>
-		int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz) 
+		int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz, MPI_Comm comm) 
 		{
 			int rank, npes;
 			MPI_Comm_size(comm, &npes);
@@ -4643,7 +4665,7 @@ namespace par {
           fclose(fp);
           // update
           bucket.clear();
-          bucket_prev = bucket_disp;
+          // bucket_prev = bucket_disp;
         }
 
 

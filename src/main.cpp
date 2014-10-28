@@ -189,15 +189,15 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
 
   // if (!myrank) std::cout << "created records" << std::endl;
 
-  // std::vector<Data_t> in_cpy(N);
-  // std::copy(in.begin(), in.end(), in_cpy.begin());
+  std::vector<Data_t> in_cpy(N);
+  std::copy(in.begin(), in.end(), in_cpy.begin());
   // std::vector<Data_t> out;
 
 
   if (!myrank) std::cout << "starting sort" << std::endl;
   // Warmup run and verification.
   // SORT_FUNCTION<Data_t>(in, out, comm);
-  // SORT_FUNCTION<Data_t>(in_cpy, comm);
+  SORT_FUNCTION<Data_t>(in_cpy, comm);
   // in=in_cpy;
 #ifdef __VERIFY__
   verify(in,in_cpy,comm);
@@ -427,7 +427,6 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 
 int main(int argc, char **argv){
   
-  /*
   if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
@@ -440,7 +439,6 @@ int main(int argc, char **argv){
 		std::cerr << "\t\t typeDistrib can be UNIF, GAUSS, ZIPF." << std::endl;
     return 1;  
   }
-  */
 
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
 
@@ -459,8 +457,9 @@ int main(int argc, char **argv){
   int p;
   MPI_Comm_size(MPI_COMM_WORLD, &p);
 
+
   //!----------------------------------
- 
+  /*
   // 1. read in file corresponding to the node % 100;
   // 2. select splitters ... 5 - 20 - print ...
   // 3. bucket and write ... with num_spliters = 20;
@@ -484,12 +483,12 @@ int main(int argc, char **argv){
   std::vector<sortRecord> qq(nl), out;
   
   // printf("%d: read size is %ld\n", myrank, lSize);
-  /*
+  / *
   srand(myrank*1713);
   for (int i=0; i<nl; i++) {
     qq[i] = rand();
   }
-  */
+  * /
   result = fread ( &(*qq.begin()), 1, lSize, fp);
   if (result != lSize) { std::cerr << myrank << ": Reading error" << std::endl; exit (3);}
   fclose (fp);
@@ -503,31 +502,31 @@ int main(int argc, char **argv){
   std::vector<std::pair<sortRecord, DendroIntL> > sortBins = par::Sorted_approx_Select_skewed(qq, 9, MPI_COMM_WORLD);
 
   if (!myrank) std::cout << myrank << ": finished approx Select" << std::endl;
-  /*
+  / *
   if (!myrank) {
     std::cout << "splitters = [" << std::endl;
     for (int i=0; i<9; ++i) std::cout << sortBins[i] << " " << std::endl;;
     std::cout << "]" << std::endl;
   }
-  */
-  
+  * /
+  / *
   double t0 = omp_get_wtime();
   par::bucketDataAndWriteSkewed(qq, sortBins, "/tmp/foo", MPI_COMM_WORLD);
   double t1 = omp_get_wtime();
   
-  /*
+  * /
   double t0 = omp_get_wtime();
   // par::HyperQuickSort(qq, out, MPI_COMM_WORLD);
   par::sampleSort(qq, MPI_COMM_WORLD);
   double t1 = omp_get_wtime();
-*/
+
   std::cout << myrank << ": all done in " << t1-t0 << std::endl;
   
   
   MPI_Finalize();
   return 0;
   //!----------------------------------
-
+  */
   int proc_group=0;
   int min_np=1;
   MPI_Comm comm;
@@ -589,8 +588,8 @@ int main(int argc, char **argv){
     }
   }
 
-	// MPI_Finalize();
-  // return 0;
+	MPI_Finalize();
+  return 0;
   
   for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
   MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);

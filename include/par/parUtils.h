@@ -394,8 +394,8 @@ namespace par {
 		void fan_merge(int k, T** A, size_t* n, T* C_);
 
 		// Move following functions to parSelect.{h,txx}
-		template<typename T>
-		int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz);
+		// template<typename T>
+		// int partitionSubArrays(std::vector<T*>& arr, std::vector<int>& a_sz);
 
 		template<typename T>
 		void rankSamples(std::vector<T>& arr, std::vector<T> samples, MPI_Comm comm);
