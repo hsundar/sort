@@ -14,6 +14,7 @@
 #include <binUtils.h>
 #include <ompUtils.h>
 #include <parUtils.h>
+#include <rankSwapSort.h>
 #include <octUtils.h>
 
 #include <TreeNode.h>
@@ -27,10 +28,14 @@
 	#if KWAY > 2
 		#define SORT_FUNCTION par::HyperQuickSort_kway
 	#else
-	 	#define SORT_FUNCTION par::HyperQuickSort
+		#ifdef SWAPRANKS
+      #define SORT_FUNCTION par::RankSwapSort
+    #else
+	 	  #define SORT_FUNCTION par::HyperQuickSort
+    #endif
 	#endif
 #else
-	#define SORT_FUNCTION par::sampleSort
+    #define SORT_FUNCTION par::sampleSort
 #endif
 
 // #define __VERIFY__
@@ -307,7 +312,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   MPI_Comm_size(comm,&p);
   int omp_p=omp_get_max_threads();
 
-  // Geerate random data
+  // Generate random data
   std::vector<T> in(N);
 	if(dist_type==UNIF_DISTRIB){
     #pragma omp parallel for
@@ -390,9 +395,9 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 	*/
 	
   // Warmup run and verification.
-  SORT_FUNCTION<T>(in, out, comm);
+  // SORT_FUNCTION<T>(in, out, comm);
   in=in_cpy;
-  // SORT_FUNCTION<T>(in_cpy, comm);
+  SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
 #endif
@@ -417,8 +422,8 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   //Sort
   MPI_Barrier(comm);
   double wtime=-omp_get_wtime();
-  SORT_FUNCTION<T>(in, out, comm);
-  // SORT_FUNCTION<T>(in, comm);
+  // SORT_FUNCTION<T>(in, out, comm);
+  SORT_FUNCTION<T>(in, comm);
   MPI_Barrier(comm);
   wtime+=omp_get_wtime();
 

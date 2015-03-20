@@ -458,6 +458,9 @@ namespace par {
 
   template<typename T>
     int HyperQuickSort_kway(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
+  
+  template<typename T>
+    int HyperQuickSort_cav(std::vector<T>& in, std::vector<T> & out, MPI_Comm comm); 
 		
   /* mem-efficient version */
   template<typename T>
@@ -465,6 +468,10 @@ namespace par {
 		
   template<typename T>
     int HyperQuickSort_kway(std::vector<T>& in, MPI_Comm comm); 
+  
+  template<typename T>
+    int HyperQuickSort_cav(std::vector<T>& in, MPI_Comm comm); 
+  
   /**
     @brief A parallel sample sort implementation. In our implementation, we do not pose any 
     restriction on the input or the number of processors. This function can be used with an odd number of processors as well.

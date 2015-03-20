@@ -1915,6 +1915,9 @@ namespace par {
       MPI_Barrier(comm);
 #endif
       PROF_SORT_BEGIN
+#ifdef _PROFILE_SORT
+    total_sort.start();
+#endif
 
       // Copy communicator. 
       MPI_Comm comm=comm_;
@@ -1925,8 +1928,14 @@ namespace par {
       MPI_Comm_rank(comm, &myrank);
       
       if(npes==1){
-        omp_par::merge_sort(&arr[0],&arr[arr.size()]);
-        // SortedElem  = arr;
+#ifdef _PROFILE_SORT
+				seq_sort.start();
+#endif        
+				omp_par::merge_sort(&arr[0],&arr[arr.size()]);
+#ifdef _PROFILE_SORT
+				seq_sort.stop();
+				total_sort.stop();
+#endif        
         PROF_SORT_END
       }
       // buffers ... keeping all allocations together 
@@ -1945,12 +1954,21 @@ namespace par {
       DendroIntL nelem_ = nelem;
 
       // Local sort.
+#ifdef _PROFILE_SORT
+			seq_sort.start();
+#endif			
       omp_par::merge_sort(&arr[0], &arr[arr.size()]);
+#ifdef _PROFILE_SORT
+			seq_sort.stop();
+#endif			
 
       // Binary split and merge in each iteration.
       while(npes>1 && totSize>0){ // O(log p) iterations.
 
         //Determine splitters. O( log(N/p) + log(p) )
+#ifdef _PROFILE_SORT
+    hyper_compute_splitters.start();
+#endif				
         T split_key;
         DendroIntL totSize_new;
         //while(true)
@@ -2013,10 +2031,16 @@ namespace par {
           //if(fabs(err)<0.01 || npes<=16) break;
           //else if(!myrank) std::cout<<err<<'\n';
         }
+#ifdef _PROFILE_SORT
+    hyper_compute_splitters.stop();
+#endif
 
         // Split problem into two. O( N/p )
         int split_id=(npes-1)/2;
         {
+#ifdef _PROFILE_SORT
+      hyper_communicate.start();
+#endif				
           int new_p0 = (myrank<=split_id?0:split_id+1);
           int cmp_p0 = (myrank> split_id?0:split_id+1);
           int new_np = (myrank<=split_id? split_id+1: npes-split_id-1);
@@ -2049,6 +2073,10 @@ namespace par {
           char* ext_rbuff=(ext_rsize>0? new char[ext_rsize]: NULL);
           MPI_Sendrecv                  (sbuff,ssize,MPI_BYTE, partner,0,       rbuff,    rsize,MPI_BYTE, partner,   0,comm,&status);
           if(extra_partner) MPI_Sendrecv( NULL,    0,MPI_BYTE,split_id,0,   ext_rbuff,ext_rsize,MPI_BYTE,split_id,   0,comm,&status);
+#ifdef _PROFILE_SORT
+      hyper_communicate.stop();
+      hyper_merge.start();
+#endif
 
           int nbuff_size=lsize+rsize+ext_rsize;
           mergeBuff.reserve(nbuff_size/sizeof(T));
@@ -2073,14 +2101,23 @@ namespace par {
           //Free memory.
           // if(    rbuff!=NULL) delete[]     rbuff;
           if(ext_rbuff!=NULL) delete[] ext_rbuff;
+#ifdef _PROFILE_SORT
+      hyper_merge.stop();
+#endif
         }
 
         {// Split comm.  O( log(p) ) ??
+#ifdef _PROFILE_SORT
+    hyper_comm_split.start();
+#endif				
           MPI_Comm scomm;
           MPI_Comm_split(comm, myrank<=split_id, myrank, &scomm );
           comm=scomm;
           npes  =(myrank<=split_id? split_id+1: npes  -split_id-1);
           myrank=(myrank<=split_id? myrank    : myrank-split_id-1);
+#ifdef _PROFILE_SORT
+    hyper_comm_split.stop();
+#endif				
         }
       }
 
@@ -2091,6 +2128,9 @@ namespace par {
       // par::partitionW<T>(SortedElem, NULL , comm_);
 //      par::partitionW<T>(arr, NULL , comm_);
 
+#ifdef _PROFILE_SORT
+  total_sort.stop();
+#endif
       PROF_SORT_END
     }//end function
 
