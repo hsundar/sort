@@ -396,7 +396,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
 	
   // Warmup run and verification.
   // SORT_FUNCTION<T>(in, out, comm);
-  in=in_cpy;
+  // in=in_cpy;
   SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
   verify(in,out,comm);
