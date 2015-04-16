@@ -1,5 +1,5 @@
 \documentclass{sig-alternate}
-
+\usepackage{color}
 \begin{document}
 %
 % --- Author Metadata here ---
@@ -44,12 +44,101 @@ review popular distributed sorting algorithms. Talk briefly about communication 
 
 Here describe the actual sorting algorithms used.
 
+\section{Energy-Efficient Node Sorting}
+The previously-described distributed sorting algorithm relies
+on a node-level sort of the subset of data assigned to each node at 
+each stage of the sort.  This section describes how we arrive 
+at a node-level sorting algorithm that is both energy efficient and
+high performance.  
+
+{\color{red}Establish that GPU is highest performing and most energy efficient for node sort.
+Show performance/energy difference on Jetson compared with OpenMP?}  
+
+\noindent
+{\bf Sorting algorithms.}
+In this paper, we select among two algorithms to use for
+the node-level sort.  
+\begin{itemize}
+\item \emph{Merge Sort:}
+Merge Sort sorts a list of data by 
+recursively splitting the list in half, sorting each half,
+and then merging the two sorted lists together.
+The Merge Sort implementation we use is
+part of the ModernGPU~\cite{modernGPU} library of GPU
+primitives.  
+\item \emph{Radix sort:}
+Radix Sort achieves a sorted list by grouping keys by individual digits  
+that have the same position and value.
+The Radix sort implementation is provided in CUB~\cite{cub}. 
+\end{itemize}
+{\color{red} May want to also say when one might be preferable to another.}
+
+\noindent
+{\bf Managing energy and power on the GPU.} 
+We use two mechanisms to adjust energy and power usage on the GPU.  
+We can monitor energy or power usage for each of the two 
+sort algorithms, and together with performance measurements,
+select the preferred algorithm.  In addition, the target Nvidia GPUs
+allow adjusting of the clock frequency, or frequency of the memory
+bus.  Through monitoring energy or power at different frequency
+settings, we can select the preferred frequency(ies).  
+
+
+\noindent
+{\bf Multi-objective tuning.}
+Since we would prefer an implementation that is both high performing and
+energy efficient, we employ multi-objective tuning, which selects an 
+implementation according to both its performance and its energy usage or
+peak power requirements.  
+{\color{red}What is our selection criteria?}
+
+\noindent
+{\bf Code variant selection using Nitro.}
+The system described in this paper extends
+the Nitro autotuning framework~\cite{muralidharan:2014}.
+Nitro provides a library interface that permits expert programmers to
+express code variants along with meta-information that aids
+the system in selecting among the set of variants at runtime.
+Figure~\ref{fig:overview} illustrates the approach in Nitro.  
+A learning algorithm -- Support Vector Machine (SVM) classifier by default -- co
+nstructs a 
+code variant selection
+model on the target architecture as a result of an offline training phase on the
+ same architecture.
+For each architecture, training data has the form
+$\{(\mathbf{x}_1, y_1), \hdots, (\mathbf{x}_M, y_M)\}$, where
+each $\mathbf{x}_i$ represents an input feature vector and each
+$y_i$ represents the best variant for that input.
+When presented with a new, unseen input at runtime, the model
+predicts the best variant to use. 
+
+In this paper, we extend Nitro in two ways: (1) we treat 
+different clock frequencies as code variants, in addition to the
+different sorting algorithms; and, (2) the model is trained
+using both performance and energy/power data, according to the 
+previously-described multi-objective selection criteria.
+
 \section{Experimental Setup}
 
 Talk about architectures used, how we measure energy etc.
 
+{\color{red} All machines listed as items.  Should this be a table?}
+\begin{itemize}
+\item Titan: get specs from ORNL (performance measurements only); version of CUDA(5.0?)/compiler?
+\item SCI cluster
+\item Jetson cluster (physical measurements); version of CUDA/compiler?
+\item Standalone Nvidia K20c for node-level experiments (describe tool); version of CUDA/compiler?
+\end{itemize}
+
 \section{Results}
 
+{\color{red} Things to answer.}
+\begin{itemize}
+\item Are different algorithms affected differently by frequency adjustment?
+\item How does frequency affect performance/energy/power?
+\item End with SCI cluster and Titan results, and extrapolate from prior 
+measurements.
+\end{itemize}
 
 \section{Discussion}
 Discuss results and what the key findings are and what it means for future architectures.
@@ -62,7 +151,7 @@ Thank Christopher Strong, nvidia?, Funding agencies.
 
 %
 \bibliographystyle{abbrv}
-\bibliography{esort} 
+\bibliography{esort,tuning,nitro} 
 
 %\balancecolumns % GM June 2007
 % That's all folks!
