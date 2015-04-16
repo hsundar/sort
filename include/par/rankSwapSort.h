@@ -3,9 +3,16 @@
 
 #include <cstdio>
 
+#include "dendro.h"
+
+// #define DendroIntL long long
+
 #ifdef _PROFILE_SORT
   #include "sort_profiler.h"
 #endif
+
+#include <mpi.h>
+
 
 namespace par {
 
@@ -35,13 +42,16 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
 #ifdef _PROFILE_SORT
     seq_sort.start();
 #endif        
+    // printf("%d: starting seq sort\n", myrank); fflush(stdout);
     omp_par::merge_sort(&arr[0],&arr[arr.size()]);
+    // printf("%d: done seq sort\n", myrank); fflush(stdout);
 #ifdef _PROFILE_SORT
     seq_sort.stop();
     total_sort.stop();
 #endif        
     PROF_SORT_END
   }
+  
   // buffers ... keeping all allocations together 
   std::vector<T>  commBuff;
   std::vector<T>  mergeBuff;
@@ -56,18 +66,26 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
   DendroIntL totSize, nelem = arr.size(); assert(nelem);
   par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
   DendroIntL nelem_ = nelem;
-  if (!myrank) printf(" starting sequential sort\n");
+ 
+  if (!myrank) printf("starting sequential sort - %lld\n", totSize); fflush(stdout);
 
   // Local sort.  O(n/p log n/p)
 #ifdef _PROFILE_SORT
   seq_sort.start();
 #endif			
-  // omp_par::merge_sort(&arr[0], &arr[arr.size()]);
-  std::sort(&arr[0], &arr[arr.size()]);
+  omp_par::merge_sort(&arr[0], &arr[arr.size()]);
+  // std::sort(&arr[0], &arr[arr.size()]);
 #ifdef _PROFILE_SORT
   seq_sort.stop();
 #endif			
-  if (!myrank) printf("finished sequential sort \n");
+
+  /*
+  MPI_Barrier(comm);
+  if(!myrank) {
+    printf("finished sequential sort \n");
+    printf("-----------------------------------\n"); fflush(stdout);
+  }
+  */
 
   // Binary split and merge in each iteration.
   while(npes>1 && totSize>0){ // O(log p) iterations.
@@ -81,7 +99,9 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
     //while(true)
     { 
       // Take random splitters. O( 1 ) -- Let p * splt_count = glb_splt_count = const = 100~1000
-      int splt_count = (1000*nelem)/totSize; 
+
+      DendroIntL splts =  nelem; splts = (splts*1000)/totSize; 
+      int splt_count = splts;
       if (npes>1000) 
         splt_count = ( ((float)rand()/(float)RAND_MAX)*totSize < (1000*nelem) ? 1 : 0 );
 
@@ -90,8 +110,8 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
 
       std::vector<T> splitters(splt_count);
       for(size_t i=0;i<splt_count;i++) 
-        splitters[i]=arr[rand()%nelem];
-
+        splitters[i] = arr[rand() % nelem];
+      
       // Gather all splitters. O( log(p) )
       int glb_splt_count;
 
@@ -105,7 +125,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
       MPI_Allgatherv(&splitters[0], splt_count, par::Mpi_datatype<T>::value(), 
           &glb_splitters[0], &glb_splt_cnts[0], &glb_splt_disp[0], 
           par::Mpi_datatype<T>::value(), comm);
-
+      
       // Determine split key. O( log(N/p) + log(p) )
       std::vector<DendroIntL> disp(glb_splt_count,0);
 
@@ -125,6 +145,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
       split_key = glb_splitters[split_disp - &glb_disp[0]];
 
       totSize_new=(myrank<=(npes-1)/2?*split_disp:totSize-*split_disp);
+      
       //double err=(((double)*split_disp)/(totSize/2))-1.0;
       //if(fabs(err)<0.01 || npes<=16) break;
       //else if(!myrank) std::cout<<err<<'\n';
@@ -132,6 +153,9 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
 #ifdef _PROFILE_SORT
     hyper_compute_splitters.stop();
 #endif
+      
+    MPI_Barrier(comm);
+    if (!myrank) { printf("done with splitters\n"); fflush(stdout); }
 
     // Split problem into two. O( N/p )
     bool swap_ranks = false;
@@ -206,6 +230,9 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
         }
       } 
       // } modify for rank-swap
+      
+      MPI_Barrier(comm);
+      if (!myrank) printf("starting data exchange\n"); fflush(stdout);
       
       // Exchange data.
       commBuff.reserve(rsize/sizeof(T));

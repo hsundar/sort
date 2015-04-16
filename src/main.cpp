@@ -38,7 +38,7 @@
     #define SORT_FUNCTION par::sampleSort
 #endif
 
-// #define __VERIFY__
+#define __VERIFY__
 
 
 enum DistribType{
@@ -399,7 +399,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   // in=in_cpy;
   SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
-  verify(in,out,comm);
+  verify(in,in_cpy,comm);
 #endif
 
 #ifdef _PROFILE_SORT
