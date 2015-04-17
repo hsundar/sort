@@ -328,14 +328,17 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
     double e=2.7182818284590452;
     double log_e=log(e);
 
+    unsigned int seed1=p+myrank;
+    long mn = rand_r(&seed1);
+
     #pragma omp parallel for
     for(int j=0;j<omp_p;j++){
       unsigned int seed=j*p+myrank;
       size_t start=(j*N)/omp_p;
       size_t end=((j+1)*N)/omp_p;
       for(unsigned int i=start;i<end;i++){ 
-        in[i]=sqrt(-2*log(rand_r(&seed)*1.0/RAND_MAX)/log_e)
-              * cos(rand_r(&seed)*2*M_PI/RAND_MAX)*RAND_MAX*0.1;
+        in[i]= mn + sqrt(-2*log(rand_r(&seed)*1.0/RAND_MAX)/log_e)
+              * cos(rand_r(&seed)*2*M_PI/RAND_MAX)*RAND_MAX*0.01;
       }
     }
 	}else if(dist_type==ZIPF_DISTRIB){
