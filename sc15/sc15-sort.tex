@@ -53,11 +53,33 @@ each stage of the sort.  This section describes how we arrive
 at a node-level sorting algorithm that is both energy efficient and
 high performance.  
 
-{\color{red}Establish that GPU is highest performing and most energy efficient for node sort.
-Show performance/energy difference on Jetson compared with OpenMP?}  
+\subsection{Overview of Approach}
+We first present an overview of the node-level sorting approach, 
+looking at factors such as resource selection in a heterogeneous platform, 
+sorting algorithms, and how we extend an existing framework for performance
+optimization to also take into account energy and power consumption.
 
 \noindent
-{\bf Sorting algorithms.}
+{\bf GPU vs. Parallel CPU Sorting.}
+{\color{red}Establish that GPU is highest performing and most energy efficient for node sort.
+Show performance (and possibly energy) 
+difference for both Titan and Jetson compared with OpenMP?}  
+
+\vspace*{.1in}
+
+\noindent
+{\bf Sorting algorithms as code variants.}
+It is well established that the best algorithm for sorting
+is dependent on input data set (type, size and distribution), target 
+architecture and implementation details.   Therefore, the best-performing
+and most energy-efficient implementation cannot
+be determined until run time without a prior knowledge of these factors.
+We refer to different sorting algorithms or implementations
+as \emph{code variants}.  
+A number of techniques for code variant selection and algorithm
+selection have been described in the literature~\cite{algsel}, and our approach
+will rely on recent advancements in this area as described in this section.
+ 
 In this paper, we select among two algorithms to use for
 the node-level sort.  
 \begin{itemize}
@@ -75,6 +97,8 @@ The Radix sort implementation is provided in CUB~\cite{cub}.
 \end{itemize}
 {\color{red} May want to also say when one might be preferable to another.}
 
+\vspace*{.1in}
+
 \noindent
 {\bf Managing energy and power on the GPU.} 
 We use two mechanisms to adjust energy and power usage on the GPU.  
@@ -85,18 +109,23 @@ allow adjusting of the clock frequency, or frequency of the memory
 bus.  Through monitoring energy or power at different frequency
 settings, we can select the preferred frequency(ies).  
 
-
-\noindent
-{\bf Multi-objective tuning.}
 Since we would prefer an implementation that is both high performing and
-energy efficient, we employ multi-objective tuning, which selects an 
-implementation according to both its performance and its energy usage or
-peak power requirements.  
-{\color{red}What is our selection criteria?}
+power or energy efficient, we must develop a \emph{selection 
+criteria} that considers multiple optimization goals in selecting the
+node-level sorting algorithm.
+%employ multi-objective tuning, which selects an 
+%implementation according to both its performance and its energy usage or
+%peak power requirements.  
+The next subsection will describe
+a number of different selection criteria we explore in this paper
+and their overall impact on performance, energy and power.
+
+\vspace*{.1in}
 
 \noindent
 {\bf Code variant selection using Nitro.}
-The system described in this paper extends
+The system described in this paper used for code variant
+selection extends
 the Nitro autotuning framework~\cite{muralidharan:2014}.
 Nitro provides a library interface that permits expert programmers to
 express code variants along with meta-information that aids
@@ -113,14 +142,48 @@ each $\mathbf{x}_i$ represents an input feature vector and each
 $y_i$ represents the best variant for that input.
 When presented with a new, unseen input at runtime, the model
 predicts the best variant to use. 
-
+For sort, prior work has used data type, data set size and presortedness
+as features~\cite{muralidharan:2014}.  In this paper,
+we omit presortedness, and replace it with the distribution
+of key values.  These three features are available when the
+sort is invoked, and can be used in consulting a model for code
+variant selection at run time.
 In this paper, we extend Nitro in two ways: (1) we treat 
 different clock frequencies as code variants, in addition to the
 different sorting algorithms; and, (2) the model is trained
 using both performance and energy/power data, according to the 
-previously-described multi-objective selection criteria.
+selection criteria outlined in the next subsection.
 
-\section{Experimental Setup}
+\subsection{Code Variant Selection Criteria}
+Application tuning that looks at multiple optimization criteria
+is referred to as \emph{multi-objective tuning}.
+A challenge with multi-objective tuning is that the solution must encompass
+a tradeoff space between different optimization objectives.  Any 
+solution among the \emph{Pareto frontier} is valid; these points are ones
+for which there is no other solution that has better metrics among
+all the set of objectives.
+{\color{red} CLEAN UP AND ADD CITATIONS!!!
+Techniques for multi-objective tuning resolve this selection in several
+ways:
+(1) treat one objective as independent (e.g., an equivalence class
+as in PetaBricks paper);  (2) weight one objective above others; 
+(3) ask users; (4) use heuristics to drive optimization; or, (5) come up with combined metric.}
+
+In this paper, we have chosen to use a set of fairly standard combined metrics.
+We explore which leads to the best reduction in energy or power with the least
+impact on performance.  These metrics are as follows: 
+\begin{itemize}
+\item MKeys per Joule: {\color{red} Define}
+\item MKeys$^2$ per Joule: {\color{red} Define}
+\item MKeys per Watt: {\color{red} Define}
+\item MKeys$^2$ per Watt: {\color{red} Define}
+\end{itemize}
+These were selected because they capture the relationship between throughput
+and energy or power.  Further, it is straightforward to build a model 
+for code variant selection by consolidating on a single metric.
+In our experiments we will show {\color{red} some indication that this works well.}
+
+\section{Experimental Methodology}
 
 {\color{red} Talk about architectures used, how we measure energy etc.}
 
@@ -166,7 +229,7 @@ Titan GPU results using other representative clusters.
 For the node-level experiments, we used an Nvidia K20c (Kepler 
 generation) standalone GPU, representative of the Titan nodes.  
 This machine has 13 GPU streaming multiprocessors, 
-for a total of 2496 cores, default clock rate of 758 MHz,
+for a total of 2496 cores, 
 XXX GBytes of memory and {\color{red} cache structure.}
 It uses CUDA 6.5 and nvcc compiler version XXX.
 We use this machine in our experiments because we have complete control 
@@ -174,8 +237,8 @@ over its installation, software tools and configuration for each run.
 
 For energy and power measurements, we use {\color{red} 
 ... identify software power
-measurement tool and other details of methodology}.  The K20c has XXX clock frequency settings,
-which can be adjusted 
+measurement tool and other details of methodology}.  The K20c has five clock frequency settings ranging from 614MHz to 758MHz, with 705MHz as the default setting.
+The clock frequency can be adjusted 
 {\color{red} ... say how:
  list frequencies}.  It has two memory frequencies as well, 
 but we do not adjust memory frequency in these experiments 
