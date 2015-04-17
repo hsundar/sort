@@ -5,7 +5,7 @@
 
 #include "dendro.h"
 
-// #define DendroIntL long long
+// #define long long long
 
 #ifdef _PROFILE_SORT
   #include "sort_profiler.h"
@@ -63,11 +63,11 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
   srand(myrank);
 
   // Local and global sizes. O(log p)
-  DendroIntL totSize, nelem = arr.size(); assert(nelem);
-  par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
-  DendroIntL nelem_ = nelem;
+  long totSize, nelem = arr.size(); assert(nelem);
+  par::Mpi_Allreduce<long>(&nelem, &totSize, 1, MPI_SUM, comm);
+  long nelem_ = nelem;
  
-  if (!myrank) printf("starting sequential sort - %lld\n", totSize); fflush(stdout);
+  if (!myrank) printf("starting sequential sort - %ld\n", totSize); fflush(stdout);
 
   // Local sort.  O(n/p log n/p)
 #ifdef _PROFILE_SORT
@@ -95,12 +95,12 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
     hyper_compute_splitters.start();
 #endif				
     T split_key;
-    DendroIntL totSize_new;
+    long totSize_new;
     //while(true)
     { 
       // Take random splitters. O( 1 ) -- Let p * splt_count = glb_splt_count = const = 100~1000
 
-      DendroIntL splts =  nelem; splts = (splts*1000)/totSize; 
+      long splts =  nelem; splts = (splts*1000)/totSize; 
       int splt_count = splts;
       if (npes>1000) 
         splt_count = ( ((float)rand()/(float)RAND_MAX)*totSize < (1000*nelem) ? 1 : 0 );
@@ -127,7 +127,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
           par::Mpi_datatype<T>::value(), comm);
       
       // Determine split key. O( log(N/p) + log(p) )
-      std::vector<DendroIntL> disp(glb_splt_count,0);
+      std::vector<long> disp(glb_splt_count,0);
 
       if(nelem>0){
 #pragma omp parallel for
@@ -135,10 +135,10 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
           disp[i]=std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
         }
       }
-      std::vector<DendroIntL> glb_disp(glb_splt_count,0);
-      MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
+      std::vector<long> glb_disp(glb_splt_count,0);
+      MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<long>::value(), MPI_SUM, comm);
 
-      DendroIntL* split_disp = &glb_disp[0];
+      long* split_disp = &glb_disp[0];
       for(size_t i=0; i<glb_splt_count; i++)
         if ( abs(glb_disp[i] - totSize/2) < abs(*split_disp - totSize/2) ) 
           split_disp = &glb_disp[i];
@@ -332,9 +332,9 @@ int RankSwapSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm
   srand(myrank);
 
   // Local and global sizes. O(log p)
-  DendroIntL totSize, nelem = arr.size(); assert(nelem);
-  par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
-  DendroIntL nelem_ = nelem;
+  long totSize, nelem = arr.size(); assert(nelem);
+  par::Mpi_Allreduce<long>(&nelem, &totSize, 1, MPI_SUM, comm);
+  long nelem_ = nelem;
 
   // Local sort.
 #ifdef _PROFILE_SORT
@@ -353,7 +353,7 @@ int RankSwapSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm
     hyper_compute_splitters.start();
 #endif				
     T split_key;
-    DendroIntL totSize_new;
+    long totSize_new;
     //while(true)
     { 
       // Take random splitters. O( 1 ) -- Let p * splt_count = glb_splt_count = const = 100~1000
@@ -377,17 +377,17 @@ int RankSwapSort(std::vector<T>& arr, std::vector<T> & SortedElem, MPI_Comm comm
           par::Mpi_datatype<T>::value(), comm);
 
       // Determine split key. O( log(N/p) + log(p) )
-      std::vector<DendroIntL> disp(glb_splt_count,0);
+      std::vector<long> disp(glb_splt_count,0);
       if(nelem>0){
 #pragma omp parallel for
         for(size_t i=0;i<glb_splt_count;i++){
           disp[i]=std::lower_bound(&arr_[0], &arr_[nelem], glb_splitters[i])-&arr_[0];
         }
       }
-      std::vector<DendroIntL> glb_disp(glb_splt_count,0);
-      MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
+      std::vector<long> glb_disp(glb_splt_count,0);
+      MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<long>::value(), MPI_SUM, comm);
 
-      DendroIntL* split_disp=&glb_disp[0];
+      long* split_disp=&glb_disp[0];
       for(size_t i=0;i<glb_splt_count;i++)
         if( labs(glb_disp[i]-totSize/2) < labs(*split_disp-totSize/2)) split_disp=&glb_disp[i];
       split_key=glb_splitters[split_disp-&glb_disp[0]];
