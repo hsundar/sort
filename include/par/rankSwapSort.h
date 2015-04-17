@@ -90,7 +90,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
   }
   */
   
-  // int iter=0;
+  int iter=0;
   _rank = myrank;
   // Binary split and merge in each iteration.
   while(npes>1 && totSize>0){ // O(log p) iterations.
@@ -150,7 +150,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
         if ( abs(glb_disp[i] - totSize/2) < abs(*split_disp - totSize/2) ) 
           split_disp = &glb_disp[i];
       
-      //printf("%d ## %d ---- %d\n", iter, _rank, glb_splt_count); fflush(stdout);
+      // printf("%d ## %d ---- %d\n", iter, _rank, glb_splt_count); fflush(stdout);
       split_key = glb_splitters[split_disp - &glb_disp[0]];
       // printf("%d ~~ %d\n", iter, _rank); fflush(stdout);
 
@@ -189,7 +189,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
       char *low_buff, *high_buff;
       char *sbuff, *lbuff; 
 
-      int     rsizes[2],     ssizes[2], rsize=0, ssize=0, lsize;
+      long     rsizes[2],     ssizes[2], rsize=0, ssize=0, lsize;
 
       size_t split_indx=(nelem>0?std::lower_bound(&arr[0], &arr[nelem], split_key)-&arr[0]:0);
       
@@ -200,7 +200,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
       high_buff = (char *)(&arr[split_indx]);
 
       MPI_Status status;
-      MPI_Sendrecv (&ssizes, 2, MPI_INT, partner, 0,   &rsizes, 2, MPI_INT, partner, 0, comm, &status);
+      MPI_Sendrecv (&ssizes, 2, MPI_LONG, partner, 0,   &rsizes, 2, MPI_LONG, partner, 0, comm, &status);
       
       // if(extra_partner) MPI_Sendrecv(&ext_ssize,1,MPI_INT,split_id,0,   &ext_rsize,1,MPI_INT,split_id,   0,comm,&status);
 
@@ -241,7 +241,9 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
         }
       } 
       // } modify for rank-swap
-      
+     
+      // printf("pre --- %d: %ld + %ld = %ld\n", _rank, ssizes[0], ssizes[1], ssizes[0]+ssizes[1]);fflush(stdout);
+      // printf("pos --- %d: %ld + %ld = %ld\n", _rank, lsize, rsize, lsize+rsize);fflush(stdout);
       // Exchange data.
       commBuff.reserve(rsize/sizeof(T));
       char*     rbuff = (char *)(&commBuff[0]);
@@ -261,6 +263,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
       totSize=totSize_new;
       nelem = nbuff_size/sizeof(T);
       mergeBuff.swap(arr);
+      mergeBuff.clear();
 
       // printf("++++ %d :  %ld, %ld +++++ \n", _rank, nelem, totSize); 
 #ifdef _PROFILE_SORT
@@ -273,7 +276,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
     hyper_comm_split.start();
 #endif				
       MPI_Comm scomm;
-      // int oldrank = myrank, grank;
+      int oldrank = myrank, grank;
       // printf("--> %d || %d, %d \n", iter, _rank, oldrank);fflush(stdout);
       if (swap_ranks) {
         MPI_Comm_split(comm, partner<=split_id, partner, &scomm );
@@ -291,7 +294,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
 
       // MPI_Barrier(comm_);
       // if (!_rank) printf("---------\n"); fflush(stdout);
-      // iter++;
+      iter++;
 #ifdef _PROFILE_SORT
     hyper_comm_split.stop();
 #endif				
