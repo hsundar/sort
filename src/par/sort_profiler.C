@@ -21,6 +21,7 @@ sort_profiler_t 				hyper_comm_split;
 sort_profiler_t 				seq_sort;
 sort_profiler_t					sort_partitionw;
 
+long                    total_bytes;
 
 sort_profiler_t::sort_profiler_t () {
 	seconds  = 0.0;   // openmp wall time

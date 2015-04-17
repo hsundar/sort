@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <string>
 #include <iomanip>
 #include <cstdio>
 #include <cstdlib>
@@ -6,6 +7,7 @@
 #include <vector>
 #include <omp.h>
 #include <sstream>
+
 
 #ifdef _PROFILE_SORT
 #include "sort_profiler.h"
@@ -550,8 +552,17 @@ int main(int argc, char **argv){
     return 2;
   }
  
+  std::string num;
+  std::stringstream mystream;
+  mystream << N*p;
+  num = mystream.str();
+  int insertPosition = num.length() - 3;
+  while (insertPosition > 0) {
+    num.insert(insertPosition, ",");
+    insertPosition-=3;
+  }
   if (!myrank)
-    std::cout << "sorting array of size " << N*p << " of type " << dtype << std::endl;
+    std::cout << "sorting array of size " << num << " bytes of type " << dtype << std::endl;
 
   // check if arguments are ok ...
     
@@ -584,7 +595,11 @@ int main(int argc, char **argv){
 		#ifndef KWICK
 			std::cout << "\tSample Sort with " << KWAY << "-way all2all" << "\t\tMean\tMin\tMax" << std::endl;
 		#else
-			std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
+		  #ifdef SWAPRANKS
+			  std::cout << "\t" << KWAY << "-way SwapRankSort " << "\t\tMean\tMin\tMax" << std::endl;
+      #else	
+        std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
+		  #endif
 		#endif
 			std::cout << "---------------------------------------------------------------------------" << std::endl;
 		}
@@ -596,8 +611,8 @@ int main(int argc, char **argv){
     }
   }
 
-	MPI_Finalize();
-  return 0;
+	// MPI_Finalize();
+  // return 0;
   
   for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
   MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
@@ -647,6 +662,7 @@ int main(int argc, char **argv){
 		}
 	}
 
+  MPI_Barrier(MPI_COMM_WORLD);
 
   std::vector<double> tt_glb(10000);
   MPI_Reduce(&tt[0], &tt_glb[0], 10000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -726,6 +742,19 @@ void printResults(int num_threads, MPI_Comm comm) {
 		if (!myrank) {	
 			std::cout << "comm split        \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
 		}
+    if (!myrank) {
+      std::string num;
+      std::stringstream mystream;
+      mystream << total_bytes;
+      num = mystream.str();
+      int insertPosition = num.length() - 3;
+      while (insertPosition > 0) {
+        num.insert(insertPosition, ",");
+        insertPosition-=3;
+      }
+      std::cout << "total comm        \t\t\t" << num << " bytes" <<  std::endl; 
+    }
+
 #endif
 		if (!myrank) {			
 			// std::cout << "---------------------------------------------------------------------------" << std::endl;

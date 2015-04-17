@@ -23,10 +23,11 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
 #endif
   PROF_SORT_BEGIN
 #ifdef _PROFILE_SORT
+    long bytes_comm=0;
+    total_bytes = 0;
     total_sort.start();
 #endif
 
-  long bytes_comm=0;
 
   // Copy communicator. 
   MPI_Comm comm=comm_;
@@ -36,7 +37,7 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
   MPI_Comm_size(comm, &npes);
   MPI_Comm_rank(comm, &myrank);
 
-  if (!myrank) printf("__rank_swap_sort___\n");
+  // if (!myrank) printf("__rank_swap_sort___\n");
 
   if(npes==1){
     // if (!myrank) printf("npes == 1\n");
@@ -245,8 +246,8 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
       commBuff.reserve(rsize/sizeof(T));
       char*     rbuff = (char *)(&commBuff[0]);
       MPI_Sendrecv (sbuff, ssize, MPI_BYTE, partner, 0, rbuff, rsize, MPI_BYTE, partner, 0, comm, &status);
-      bytes_comm += ssize;
 #ifdef _PROFILE_SORT
+      bytes_comm += ssize;
       hyper_communicate.stop();
       hyper_merge.start();
 #endif
@@ -314,12 +315,10 @@ int RankSwapSort(std::vector<T>& arr, MPI_Comm comm_){ // O( ((N/p)+log(p))*(log
 
 #ifdef _PROFILE_SORT
   total_sort.stop();
-#endif
   
-  long total_comm=0;
-  par::Mpi_Allreduce<long>(&bytes_comm, &total_comm, 1, MPI_SUM, comm_);
-
-  if (!_rank) printf("Total comm is %ld bytes\n", total_comm);
+  par::Mpi_Allreduce<long>(&bytes_comm, &total_bytes, 1, MPI_SUM, comm_);
+  // if (!_rank) printf("Total comm is %ld bytes\n", total_comm);
+#endif
   
   PROF_SORT_END
 }//end function

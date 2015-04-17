@@ -1916,10 +1916,10 @@ namespace par {
 #endif
       PROF_SORT_BEGIN
 #ifdef _PROFILE_SORT
+    long bytes_comm=0;
     total_sort.start();
 #endif
 
-      long bytes_comm=0, total_comm;
 
       // Copy communicator. 
       MPI_Comm comm=comm_;
@@ -2075,11 +2075,11 @@ namespace par {
           char*     rbuff = (char *)(&commBuff[0]);
           char* ext_rbuff=(ext_rsize>0? new char[ext_rsize]: NULL);
           MPI_Sendrecv                  (sbuff,ssize,MPI_BYTE, partner,0,       rbuff,    rsize,MPI_BYTE, partner,   0,comm,&status);
-          bytes_comm += ssize;
           if(extra_partner) MPI_Sendrecv( NULL,    0,MPI_BYTE,split_id,0,   ext_rbuff,ext_rsize,MPI_BYTE,split_id,   0,comm,&status);
 #ifdef _PROFILE_SORT
-      hyper_communicate.stop();
-      hyper_merge.start();
+          bytes_comm += ssize;
+          hyper_communicate.stop();
+          hyper_merge.start();
 #endif
 
           int nbuff_size=lsize+rsize+ext_rsize;
@@ -2134,10 +2134,10 @@ namespace par {
 
 #ifdef _PROFILE_SORT
   total_sort.stop();
-#endif
 
-      par::Mpi_Allreduce<long>(&bytes_comm, &total_comm, 1, MPI_SUM, comm_);
-      if(!rank_) printf("Total comm is %ld bytes\n", total_comm);
+      par::Mpi_Allreduce<long>(&bytes_comm, &total_bytes, 1, MPI_SUM, comm_);
+      // if(!rank_) printf("Total comm is %ld bytes\n", total_comm);
+#endif
 
 
       PROF_SORT_END
