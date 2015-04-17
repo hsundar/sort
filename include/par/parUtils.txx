@@ -1919,14 +1919,17 @@ namespace par {
     total_sort.start();
 #endif
 
+      long bytes_comm=0, total_comm;
+
       // Copy communicator. 
       MPI_Comm comm=comm_;
 
       // Get comm size and rank.
-      int npes, myrank;
+      int npes, myrank, rank_;
       MPI_Comm_size(comm, &npes);
       MPI_Comm_rank(comm, &myrank);
-      
+      rank_ = myrank;
+
       if(npes==1){
 #ifdef _PROFILE_SORT
 				seq_sort.start();
@@ -1949,9 +1952,9 @@ namespace par {
       srand(myrank);
 
       // Local and global sizes. O(log p)
-      DendroIntL totSize, nelem = arr.size(); assert(nelem);
-      par::Mpi_Allreduce<DendroIntL>(&nelem, &totSize, 1, MPI_SUM, comm);
-      DendroIntL nelem_ = nelem;
+      long totSize, nelem = arr.size(); assert(nelem);
+      par::Mpi_Allreduce<long>(&nelem, &totSize, 1, MPI_SUM, comm);
+      long nelem_ = nelem;
 
       // Local sort.
 #ifdef _PROFILE_SORT
@@ -1970,7 +1973,7 @@ namespace par {
     hyper_compute_splitters.start();
 #endif				
         T split_key;
-        DendroIntL totSize_new;
+        long totSize_new;
         //while(true)
         { 
           // Take random splitters. O( 1 ) -- Let p * splt_count = glb_splt_count = const = 100~1000
@@ -2009,7 +2012,7 @@ namespace par {
                          par::Mpi_datatype<T>::value(), comm);
 
           // Determine split key. O( log(N/p) + log(p) )
-          std::vector<DendroIntL> disp(glb_splt_count,0);
+          std::vector<long> disp(glb_splt_count,0);
           
           if(nelem>0){
             #pragma omp parallel for
@@ -2017,10 +2020,10 @@ namespace par {
               disp[i]=std::lower_bound(&arr[0], &arr[nelem], glb_splitters[i]) - &arr[0];
             }
           }
-          std::vector<DendroIntL> glb_disp(glb_splt_count,0);
-          MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<DendroIntL>::value(), MPI_SUM, comm);
+          std::vector<long> glb_disp(glb_splt_count,0);
+          MPI_Allreduce(&disp[0], &glb_disp[0], glb_splt_count, par::Mpi_datatype<long>::value(), MPI_SUM, comm);
 
-          DendroIntL* split_disp = &glb_disp[0];
+          long* split_disp = &glb_disp[0];
           for(size_t i=0; i<glb_splt_count; i++)
             if ( abs(glb_disp[i] - totSize/2) < abs(*split_disp - totSize/2) ) 
 							split_disp = &glb_disp[i];
@@ -2072,6 +2075,7 @@ namespace par {
           char*     rbuff = (char *)(&commBuff[0]);
           char* ext_rbuff=(ext_rsize>0? new char[ext_rsize]: NULL);
           MPI_Sendrecv                  (sbuff,ssize,MPI_BYTE, partner,0,       rbuff,    rsize,MPI_BYTE, partner,   0,comm,&status);
+          bytes_comm += ssize;
           if(extra_partner) MPI_Sendrecv( NULL,    0,MPI_BYTE,split_id,0,   ext_rbuff,ext_rsize,MPI_BYTE,split_id,   0,comm,&status);
 #ifdef _PROFILE_SORT
       hyper_communicate.stop();
@@ -2131,6 +2135,11 @@ namespace par {
 #ifdef _PROFILE_SORT
   total_sort.stop();
 #endif
+
+      par::Mpi_Allreduce<long>(&bytes_comm, &total_comm, 1, MPI_SUM, comm_);
+      if(!rank_) printf("Total comm is %ld bytes\n", total_comm);
+
+
       PROF_SORT_END
     }//end function
 

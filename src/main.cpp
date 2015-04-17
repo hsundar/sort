@@ -38,7 +38,7 @@
     #define SORT_FUNCTION par::sampleSort
 #endif
 
-#define __VERIFY__
+// #define __VERIFY__
 
 
 enum DistribType{
@@ -234,9 +234,9 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
   // std::cout << std::endl;
   SORT_FUNCTION<Data_t>(in, comm);
   
-  if (!myrank) std::cout << "finished sort " << std::endl;
-  MPI_Barrier(comm);
-  if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
+  // if (!myrank) std::cout << "finished sort " << std::endl;
+  // MPI_Barrier(comm);
+  // if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
   
   wtime+=omp_get_wtime();
 
