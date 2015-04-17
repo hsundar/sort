@@ -234,9 +234,9 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
   // std::cout << std::endl;
   SORT_FUNCTION<Data_t>(in, comm);
   
-  if (!myrank) std::cout << "finished sort " << std::endl;
-  MPI_Barrier(comm);
-  if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
+  // if (!myrank) std::cout << "finished sort " << std::endl;
+  // MPI_Barrier(comm);
+  // if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
   
   wtime+=omp_get_wtime();
 
@@ -399,7 +399,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   // in=in_cpy;
   SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
-  verify(in,out,comm);
+  verify(in,in_cpy,comm);
 #endif
 
 #ifdef _PROFILE_SORT
