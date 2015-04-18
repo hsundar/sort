@@ -25,17 +25,32 @@ One possible way to reshuffle $A$ is to estimate the boundaries for each bucket,
 ``splitters''. This can be done  by sampling a
 subset of keys in $A$, sorting them and selecting splitters from that set. Once these $p-1$ splitters have been
 selected, a global data exchange takes place to move the original keys of every task to their correct bucket.
-An additional local sort is invoked to finalize the output array. SampleSort is well understood. However, its performance is quite sensitive to the selection of splitters, which can result in load imbalance. Most importantly, the final data exchange---requiring $\mathcal{O}(p^2)$ messages---can congest the network.
+An additional local sort is invoked to finalize the output array. SampleSort is well understood. However, its performance is quite sensitive to the selection of splitters, which can result in load imbalance. Most importantly, the final data exchange---requiring $\mathcal{O}(p^2)$ messages---can congest the network. As a result SampleSort may scale 
+suboptimally, especially when the communication volume approaches the available hardware limits \cite{hyksort}.
 
-This has lead to the development of other sort algorithms such as Hyksort\cite{hyksort} that avoid network congestion and show good performance scalability on large clusters. The general is an extension of quicksort on a Hypercube \cite{wagar87} along with an efficient parallel (median) selection algorithm. 
+Parallel HistogramSort~\cite{kale93,solomonik10} is
+a variant of SampleSort that efficiently estimates the splitters. The authors presented
+one of the largest distributed comparison sort runs (32K cores on
+BG/P) with $46\%$ efficiency. The algorithm overlaps communication
+and computation in all stages. During the splitter estimation
+stage, the iterative estimation of the ranks of the splitters is
+combined with partial local sorting of the data, by using the
+splitter candidates as pivots for quicksort. Once the splitters
+are estimated, the communication of data is staged and overlapped
+with local merging. In~\cite{solomonik10} the best throughput was
+obtained on 16,384 cores of Jaguar XT4 at ORNL for 8M (64-bit) keys
+per core; the sort took 4.3 seconds achieving a in-RAM throughput of
+14.4TB/min. 
 
-\begin{itemize}
-  \item samplesort
-  \item histogram sort
-  \item hyksort
-  \item cloudramsort
-  \item GPU, PHI
-\end{itemize}
+CloudRAMSort \cite{kim12} demonstrated good scalability on 256 nodes with shared memory
+parallelism using {\texttt pThreads} and SIMD vectorization. The
+best results are for sorting 1TB of data (10byte key + 90byte
+record) in 4.6 secs achieving an in-RAM throughput of 12.6 TB/min. They
+use a variant of Histogram Sort~\cite{kale93}, where the
+samples are iteratively computed (in parallel) in order to guarantee
+a minimum quality of load-balance. Additionally, the communication of the records is split into two parts by first communicating the keys followed by the values overlapped with the merging of the keys. 
 
-\paragraph{Energy-efficiency}
+In recent work \cite{hyksort}, we have addressed the scalability of sorting on very large clusters. Hyksort\cite{hyksort} is an extension of quicksort on a Hypercube \cite{wagar87} to a $k$-ary Hypercube along with an efficient parallel (median) selection algorithm. 
+
+\paragraph{Energy-efficient and GPU sorting}
 mention the general approaches. 
