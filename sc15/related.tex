@@ -1,0 +1,17 @@
+\section{Background}
+Keep related work here and separate from introduction. some glue text here before we go into separate subsections on the energy aspects and the algorithmic aspects of sorting.
+
+\paragraph{Code variant tuning}
+Apart from Nitro~\cite{muralidharan:2014},
+several programmer-directed autotuning frameworks support
+tuning of code/algorithmic variants.
+Petabricks~\cite{PetaBricks} 
+supports user specification of \textit{transforms} that
+are analogous to functions. Transforms are automatically
+composed together to form hybrid algorithms using a compiler
+framework and an adaptive algorithm~\cite{increa11}. Petabricks, however,
+implicitly tunes variants for the size of the input data set. Ding et
+al.~\cite{ding:2015} propose extensions to the PetaBricks language to
+enable support for tuning based on arbitrary input features.
+
+\paragraph{Multi-objective optimization}
