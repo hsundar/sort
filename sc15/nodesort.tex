@@ -11,16 +11,12 @@ looking at factors such as resource selection in a heterogeneous platform,
 sorting algorithms, and how we extend an existing framework for performance
 optimization to also take into account energy and power consumption.
 
-\noindent
-{\bf GPU vs. Parallel CPU Sorting.}
+\paragraph{GPU vs. Parallel CPU Sorting}
 {\color{red}Establish that GPU is highest performing and most energy efficient for node sort.
 Show performance (and possibly energy) 
 difference for both Titan and Jetson compared with OpenMP?}  
 
-\vspace*{.1in}
-
-\noindent
-{\bf Sorting algorithms as code variants.}
+\paragraph{Sorting algorithms as code variants}
 It is well established that the best algorithm for sorting
 is dependent on input data set (type, size and distribution), target 
 architecture and implementation details.   Therefore, the best-performing
@@ -29,7 +25,7 @@ be determined until run time without a prior knowledge of these factors.
 We refer to different sorting algorithms or implementations
 as \emph{code variants}.  
 A number of techniques for code variant selection and algorithm
-selection have been described in the literature~\cite{algsel}, and our approach
+selection have been described in the literature, and our approach
 will rely on recent advancements in this area as described in this section.
  
 In this paper, we select among two algorithms to use for
@@ -49,10 +45,7 @@ The Radix sort implementation is provided in CUB~\cite{cub}.
 \end{itemize}
 {\color{red} May want to also say when one might be preferable to another.}
 
-\vspace*{.1in}
-
-\noindent
-{\bf Managing energy and power on the GPU.} 
+\paragraph{Managing energy and power on the GPU} 
 We use two mechanisms to adjust energy and power usage on the GPU.  
 We can monitor energy or power usage for each of the two 
 sort algorithms, and together with performance measurements,
@@ -72,10 +65,7 @@ The next subsection will describe
 a number of different selection criteria we explore in this paper
 and their overall impact on performance, energy and power.
 
-\vspace*{.1in}
-
-\noindent
-{\bf Code variant selection using Nitro.}
+\paragraph{Code variant selection using Nitro}
 The system described in this paper used for code variant
 selection extends
 the Nitro autotuning framework~\cite{muralidharan:2014}.

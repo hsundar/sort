@@ -54,8 +54,20 @@ a minimum quality of load-balance. Additionally, the communication of the record
 In recent work \cite{hyksort}, we have addressed the scalability of sorting on very large clusters. Hyksort\cite{hyksort} is an extension of quicksort on a Hypercube \cite{wagar87} to a $k$-ary Hypercube along with an efficient parallel (median) selection algorithm. The current work is a modification of Hyksort\cite{hyksort} allowing
 us to avoid communication in several stages of Hyperquicksort. We describe the new communication-avoiding distributed sort algorithm in detail in \S\ref{sec:dsort}.
 
-\paragraph{Energy-efficient and GPU sorting}
-mention the general approaches. 
+\paragraph{High-performance GPU sorting}
+Several sorting algorithms tailored for GPU architectures have been proposed
+in the literature. The earliest sorting implementations were often
+based on Batcher's bitonic sort~\cite{batcher:1968}. This includes work from Purcell et al.~\cite{purcell:2003},
+and Kipfer et al.~\cite{kipfer:2005}. The advent of the CUDA programming model
+enabled the construction of more complex sorting algorithms. Harris et al.~\cite{harris:2007} implemented
+a split-based radix sort and a parallel merge sort. Le Grand~\cite{legrand:2007} and He~\cite{he:2007} described a
+histogram-based radix sort. Segmented scan-based implementations of radix and merge sorts were
+presented by Sengupta et al.~\cite{sengupta:2007}.
+Improved versions of radix and merge sorts were presented by Satish et al.~\cite{satish:2009}
+and by Merrill et al.~\cite{merrill:2011}.
+In this paper, we use two state-of-the-art GPU sorting algorithms at the
+node level: radix sort from the CUB library~\cite{cub}, and merge sort from the ModernGPU library~\cite{modernGPU}.
+%mention the general approaches. 
 
 \paragraph{Code variant tuning}
 Apart from Nitro~\cite{muralidharan:2014},
