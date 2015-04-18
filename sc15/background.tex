@@ -1,0 +1,22 @@
+\section{Background}
+Keep related work here and separate from introduction. some glue text here before we go into separate subsections on the energy aspects and the algorithmic aspects of sorting.
+
+\subsection{energy considerations on GPUs}
+
+\subsection{Sorting Algorithms}
+The design and implementation of parallel algorithms for sorting is a well studied subject. In our discussion of prior work, we focus our attention to distributed memory algorithms that have been experimentally shown to scale to large core counts and large datasets. We will also discuss related sorting algorithms (albeit not at scale) that study the energy-efficiency of sorting. We begin by a formal definition of distributed sorting.
+
+Given an array $A$ with $N$ keys and an order (comparison) relation, we would like to sort the elements of $A$ in ascending order. In a distributed memory machine with $p$ tasks, every task is assigned an $N/p$-sized block of $A$. Upon completion, task $i$ will have the $i^{\text{th}}$ block of the sorted array. Note that the overall ordering of the keys is determined by the ordering of the tasks as well as the ordering of the keys on each task.  
+
+\paragraph{Distributed sorting}
+
+\begin{itemize}
+  \item samplesort
+  \item histogram sort
+  \item hyksort
+  \item cloudramsort
+  \item GPU, PHI
+\end{itemize}
+
+\paragraph{Energy-efficiency}
+mention the general approaches. 

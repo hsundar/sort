@@ -1,0 +1,136 @@
+\section{Energy-Efficient Node Sorting}
+The previously-described distributed sorting algorithm relies
+on a node-level sort of the subset of data assigned to each node at 
+each stage of the sort.  This section describes how we arrive 
+at a node-level sorting algorithm that is both energy efficient and
+high performance.  
+
+\subsection{Overview of Approach}
+We first present an overview of the node-level sorting approach, 
+looking at factors such as resource selection in a heterogeneous platform, 
+sorting algorithms, and how we extend an existing framework for performance
+optimization to also take into account energy and power consumption.
+
+\noindent
+{\bf GPU vs. Parallel CPU Sorting.}
+{\color{red}Establish that GPU is highest performing and most energy efficient for node sort.
+Show performance (and possibly energy) 
+difference for both Titan and Jetson compared with OpenMP?}  
+
+\vspace*{.1in}
+
+\noindent
+{\bf Sorting algorithms as code variants.}
+It is well established that the best algorithm for sorting
+is dependent on input data set (type, size and distribution), target 
+architecture and implementation details.   Therefore, the best-performing
+and most energy-efficient implementation cannot
+be determined until run time without a prior knowledge of these factors.
+We refer to different sorting algorithms or implementations
+as \emph{code variants}.  
+A number of techniques for code variant selection and algorithm
+selection have been described in the literature~\cite{algsel}, and our approach
+will rely on recent advancements in this area as described in this section.
+ 
+In this paper, we select among two algorithms to use for
+the node-level sort.  
+\begin{itemize}
+\item \emph{Merge Sort:}
+Merge Sort sorts a list of data by 
+recursively splitting the list in half, sorting each half,
+and then merging the two sorted lists together.
+The Merge Sort implementation we use is
+part of the ModernGPU~\cite{modernGPU} library of GPU
+primitives.  
+\item \emph{Radix sort:}
+Radix Sort achieves a sorted list by grouping keys by individual digits  
+that have the same position and value.
+The Radix sort implementation is provided in CUB~\cite{cub}. 
+\end{itemize}
+{\color{red} May want to also say when one might be preferable to another.}
+
+\vspace*{.1in}
+
+\noindent
+{\bf Managing energy and power on the GPU.} 
+We use two mechanisms to adjust energy and power usage on the GPU.  
+We can monitor energy or power usage for each of the two 
+sort algorithms, and together with performance measurements,
+select the preferred algorithm.  In addition, the target Nvidia GPUs
+allow adjusting of the clock frequency, or frequency of the memory
+bus.  Through monitoring energy or power at different frequency
+settings, we can select the preferred frequency(ies).  
+
+Since we would prefer an implementation that is both high performing and
+power or energy efficient, we must develop a \emph{selection 
+criteria} that considers multiple optimization goals in selecting the
+node-level sorting algorithm.
+%employ multi-objective tuning, which selects an 
+%implementation according to both its performance and its energy usage or
+%peak power requirements.  
+The next subsection will describe
+a number of different selection criteria we explore in this paper
+and their overall impact on performance, energy and power.
+
+\vspace*{.1in}
+
+\noindent
+{\bf Code variant selection using Nitro.}
+The system described in this paper used for code variant
+selection extends
+the Nitro autotuning framework~\cite{muralidharan:2014}.
+Nitro provides a library interface that permits expert programmers to
+express code variants along with meta-information that aids
+the system in selecting among the set of variants at runtime.
+Figure~\ref{fig:overview} illustrates the approach in Nitro.  
+A learning algorithm -- Support Vector Machine (SVM) classifier by default -- co
+nstructs a 
+code variant selection
+model on the target architecture as a result of an offline training phase on the
+ same architecture.
+For each architecture, training data has the form
+$\{(\mathbf{x}_1, y_1), \hdots, (\mathbf{x}_M, y_M)\}$, where
+each $\mathbf{x}_i$ represents an input feature vector and each
+$y_i$ represents the best variant for that input.
+When presented with a new, unseen input at runtime, the model
+predicts the best variant to use. 
+For sort, prior work has used data type, data set size and presortedness
+as features~\cite{muralidharan:2014}.  In this paper,
+we omit presortedness, and replace it with the distribution
+of key values.  These three features are available when the
+sort is invoked, and can be used in consulting a model for code
+variant selection at run time.
+In this paper, we extend Nitro in two ways: (1) we treat 
+different clock frequencies as code variants, in addition to the
+different sorting algorithms; and, (2) the model is trained
+using both performance and energy/power data, according to the 
+selection criteria outlined in the next subsection.
+
+\subsection{Code Variant Selection Criteria}
+Application tuning that looks at multiple optimization criteria
+is referred to as \emph{multi-objective tuning}.
+A challenge with multi-objective tuning is that the solution must encompass
+a tradeoff space between different optimization objectives.  Any 
+solution among the \emph{Pareto frontier} is valid; these points are ones
+for which there is no other solution that has better metrics among
+all the set of objectives.
+{\color{red} CLEAN UP AND ADD CITATIONS!!!
+Techniques for multi-objective tuning resolve this selection in several
+ways:
+(1) treat one objective as independent (e.g., an equivalence class
+as in PetaBricks paper);  (2) weight one objective above others; 
+(3) ask users; (4) use heuristics to drive optimization; or, (5) come up with combined metric.}
+
+In this paper, we have chosen to use a set of fairly standard combined metrics.
+We explore which leads to the best reduction in energy or power with the least
+impact on performance.  These metrics are as follows: 
+\begin{itemize}
+\item MKeys per Joule: {\color{red} Define}
+\item MKeys$^2$ per Joule: {\color{red} Define}
+\item MKeys per Watt: {\color{red} Define}
+\item MKeys$^2$ per Watt: {\color{red} Define}
+\end{itemize}
+These were selected because they capture the relationship between throughput
+and energy or power.  Further, it is straightforward to build a model 
+for code variant selection by consolidating on a single metric.
+In our experiments we will show {\color{red} some indication that this works well.}
