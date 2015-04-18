@@ -3,10 +3,7 @@
 This section describes the input data for sort and the
 three target architectures used in our experiment.
 
-\vspace*{.1in}
-
-\noindent
-{\bf Input data.}
+\paragraph{Input Data}
 As the performance of sort is dependent on its input data, we 
 use a variety of data types, distributions and sizes in our experiments.
 We consider XXX data types: 
@@ -20,10 +17,7 @@ Sizes are motivated by each experiment and the capacity of the
 target architecture.  {\color{red} For Titan, ...  
 For K20c ... For Jetson ...  Perhaps this goes in the results section.}
 
-\vspace*{.1in}
-
-\noindent
-{\bf Titan (ORNL).} 
+\paragraph{Titan (ORNL)} 
 We are interested in 
 achieving scalable energy efficiency for distributed
 sorting on supercomputers, and therefore the target architecture is the
@@ -44,10 +38,7 @@ Titan GPU results using other representative clusters.
 %{\bf K20 cluster.}
 %{\color{red} This is the SCI cluster.  Omit if we don't have results on it.}
 
-\vspace*{.1in}
-
-\noindent
-{\bf Nvidia K20c standalone GPU.}
+\paragraph{Nvidia K20c standalone GPU}
 For the node-level experiments, we used an Nvidia K20c (Kepler 
 generation) standalone GPU, representative of the Titan nodes.  
 This machine has 13 GPU streaming multiprocessors, 
@@ -68,8 +59,7 @@ is far lower than peak of {\color{red} say what it is}
 and is therefore going to perform poorly in a bandwidth-limited
 algorithm such as sort.
 
-\noindent
-{\bf Jetson TK1 cluster.}
+\paragraph{Jetson TK1 cluster}
 We also measured performance of the distributed sorting on an Nvidia 
 Jetson TK1 cluster; the nodes of the Jetson are low-power and lightweight,
 consisting of a single GPU streaming multiprocessor (Kepler generation)
@@ -90,7 +80,7 @@ To determine the power, P=IV where I is the value calculated above, and V is 12V
 The Jetson has fourteen core clock frequencies ranging from 72MHz to 852MHz,
 and twelve memory frequencies from 12.75MHz to 924MHz;
 because collecting physical measurements 
-on all 1728 combinations of core/memory frequency would 
+on all 1728 combinations of core/memory frequency per data set would 
 be prohibitively time-consuming, 
 we sampled for this experiment. {\color{red} Perhaps
 say what data we have or save for the results.}
