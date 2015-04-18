@@ -36,7 +36,12 @@ In this work we improve the energy efficiency of distributed sorting by proposin
 % \keywords{ACM proceedings, \LaTeX, text tagging}
 
 \section{Introduction}
-General overview on why this work is relevant. Motivate and connect to a larger set of problems. Highlight contributions and list limitations.
+
+Large-scale distributed sorting have focused on improving sort throughput (number of keys sorted per sec) and parallel scalability. However, for the next generation of supercomputers, additional metrics related to energy and power consumption are going to be equally if not more important. Since, sorting is entirely dominated by data movement, energy is equivalent to the total data communicated and power is proportional to the peak bandwidth utilized. This makes distributed sorting an ideal algorithm to study energy and power related optimizations. The motivation is to develop a distributed sorting algorithm that aims to minimize the overall data-movement, the peak bandwidth required without sacrificing either performance or scalability. The development of such a distributed sorting algorithm is the central contribution of this work. We propose both distributed as well as node-local strategies to achieve this goal. Our expectation is that this work will serve as guideline for the development of such energy and power efficient for a wider array of problems in the near future.
+
+Relevance. 
+ 
+Motivate and connect to a larger set of problems. Highlight contributions and list limitations.
 
 \input{background.tex}
 

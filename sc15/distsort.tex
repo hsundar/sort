@@ -1,3 +1,4 @@
 \section{Distributed Sorting}
+\label{sec:dsort}
 
-Here describe the actual sorting algorithms used.
+Large-scale distributed sorting, such as those discussed in \S\ref{sec:bg-dist}, have focused on improving sort throughput (number of keys sorted per sec) and parallel scalability. However, for the next generation of supercomputers, additional metrics related to energy and power consumption are going to be equally if not more important. Since, sorting is entirely dominated by data movement, energy is equivalent to the total data communicated and power is proportional to the peak bandwidth utilized. This makes distributed sorting an ideal algorithm to study energy and power related optimizations. The motivation is to develop a distributed sorting algorithm that aims to minimize the overall data-movement, the peak bandwidth required without sacrificing either performance or scalability. 
