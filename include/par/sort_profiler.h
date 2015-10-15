@@ -38,4 +38,6 @@ extern sort_profiler_t 				hyper_comm_split;
 extern sort_profiler_t 				seq_sort;
 extern sort_profiler_t				sort_partitionw;
 
+extern long                   total_bytes;
+
 #endif /* end of include guard: SORT_PROFILER_H_1CK8Y26 */

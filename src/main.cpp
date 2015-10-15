@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <string>
 #include <iomanip>
 #include <cstdio>
 #include <cstdlib>
@@ -6,6 +7,7 @@
 #include <vector>
 #include <omp.h>
 #include <sstream>
+
 
 #ifdef _PROFILE_SORT
 #include "sort_profiler.h"
@@ -234,9 +236,9 @@ double time_sort_bench(size_t N, MPI_Comm comm, DistribType dist_type) {
   // std::cout << std::endl;
   SORT_FUNCTION<Data_t>(in, comm);
   
-  if (!myrank) std::cout << "finished sort " << std::endl;
-  MPI_Barrier(comm);
-  if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
+  // if (!myrank) std::cout << "finished sort " << std::endl;
+  // MPI_Barrier(comm);
+  // if (!myrank) std::cout << "finished sort - crossed barrier" << std::endl;
   
   wtime+=omp_get_wtime();
 
@@ -328,13 +330,16 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
     double e=2.7182818284590452;
     double log_e=log(e);
 
+    unsigned int seed1=p+myrank;
+    long mn = rand_r(&seed1);
+
     #pragma omp parallel for
     for(int j=0;j<omp_p;j++){
       unsigned int seed=j*p+myrank;
       size_t start=(j*N)/omp_p;
       size_t end=((j+1)*N)/omp_p;
       for(unsigned int i=start;i<end;i++){ 
-        in[i]=sqrt(-2*log(rand_r(&seed)*1.0/RAND_MAX)/log_e)
+        in[i]= mn + sqrt(-2*log(rand_r(&seed)*1.0/RAND_MAX)/log_e)
               * cos(rand_r(&seed)*2*M_PI/RAND_MAX)*RAND_MAX*0.1;
       }
     }
@@ -399,7 +404,7 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   // in=in_cpy;
   SORT_FUNCTION<T>(in_cpy, comm);
 #ifdef __VERIFY__
-  verify(in,out,comm);
+  verify(in,in_cpy,comm);
 #endif
 
 #ifdef _PROFILE_SORT
@@ -547,8 +552,17 @@ int main(int argc, char **argv){
     return 2;
   }
  
+  std::string num;
+  std::stringstream mystream;
+  mystream << N*p;
+  num = mystream.str();
+  int insertPosition = num.length() - 3;
+  while (insertPosition > 0) {
+    num.insert(insertPosition, ",");
+    insertPosition-=3;
+  }
   if (!myrank)
-    std::cout << "sorting array of size " << N*p << " of type " << dtype << std::endl;
+    std::cout << "sorting array of size " << num << " keys of type " << dtype << std::endl;
 
   // check if arguments are ok ...
     
@@ -581,7 +595,11 @@ int main(int argc, char **argv){
 		#ifndef KWICK
 			std::cout << "\tSample Sort with " << KWAY << "-way all2all" << "\t\tMean\tMin\tMax" << std::endl;
 		#else
-			std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
+		  #ifdef SWAPRANKS
+			  std::cout << "\t" << KWAY << "-way SwapRankSort " << "\t\tMean\tMin\tMax" << std::endl;
+      #else	
+        std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
+		  #endif
 		#endif
 			std::cout << "---------------------------------------------------------------------------" << std::endl;
 		}
@@ -593,8 +611,8 @@ int main(int argc, char **argv){
     }
   }
 
-	MPI_Finalize();
-  return 0;
+	// MPI_Finalize();
+  // return 0;
   
   for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
   MPI_Comm_split(MPI_COMM_WORLD, proc_group, myrank, &comm);
@@ -644,6 +662,7 @@ int main(int argc, char **argv){
 		}
 	}
 
+  MPI_Barrier(MPI_COMM_WORLD);
 
   std::vector<double> tt_glb(10000);
   MPI_Reduce(&tt[0], &tt_glb[0], 10000, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -723,6 +742,19 @@ void printResults(int num_threads, MPI_Comm comm) {
 		if (!myrank) {	
 			std::cout << "comm split        \t\t\t" << meanV << "\t" << minV << "\t" << maxV <<  std::endl; 
 		}
+    if (!myrank) {
+      std::string num;
+      std::stringstream mystream;
+      mystream << total_bytes;
+      num = mystream.str();
+      int insertPosition = num.length() - 3;
+      while (insertPosition > 0) {
+        num.insert(insertPosition, ",");
+        insertPosition-=3;
+      }
+      std::cout << "total comm        \t\t\t" << num << " bytes" <<  std::endl; 
+    }
+
 #endif
 		if (!myrank) {			
 			// std::cout << "---------------------------------------------------------------------------" << std::endl;

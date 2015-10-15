@@ -1,4 +1,12 @@
 \documentclass{sig-alternate}
+% Set letter paper size:
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+\usepackage[pass]{geometry}
+
+\usepackage{color}
+\usepackage{tikz}
+\usetikzlibrary{arrows,positioning} 
 
 \begin{document}
 %
@@ -18,7 +26,8 @@
 
 \maketitle
 \begin{abstract}
-Sorting is an essential building block for several algorithms and application. In this work we improve the energy efficiency of distributed sorting by proposing a new algorithm that avoids communication whenever possible. In addition, we analyze the most energy and power efficient sorting strategies on GPUs and Heterogeneous system architectures.
+Sorting is an essential building block for several algorithms and applications. As we ramp up to the first exascale systems, it is important to look beyond the usual metrics of performance and scalability and also consider the energy and power requirements of sorting algorithms. 
+In this work we improve the energy efficiency of distributed sorting by proposing a new algorithm that avoids communication whenever possible. In addition, we analyze the most energy and power efficient sorting strategies on GPUs and Heterogeneous system architectures.
 \end{abstract}
 
 % \category{H.4}{Information Systems Applications}{Miscellaneous}
@@ -29,27 +38,22 @@ Sorting is an essential building block for several algorithms and application. I
 % \keywords{ACM proceedings, \LaTeX, text tagging}
 
 \section{Introduction}
-General overview on why this work is relavant. Motivate and connect to a larger set of problems. Highlight contributions and list limitations.
 
+Large-scale distributed sorting have focused on improving sort throughput (number of keys sorted per sec) and parallel scalability. However, for the next generation of supercomputers, additional metrics related to energy and power consumption are going to be equally if not more important. Since, sorting is entirely dominated by data movement, energy is equivalent to the total data communicated and power is proportional to the peak bandwidth utilized. This makes distributed sorting an ideal algorithm to study energy and power related optimizations. The motivation is to develop a distributed sorting algorithm that aims to minimize the overall data-movement, the peak bandwidth required without sacrificing either performance or scalability. The development of such a distributed sorting algorithm is the central contribution of this work. We propose both distributed as well as node-local strategies to achieve this goal. Our expectation is that this work will serve as guideline for the development of such energy and power efficient for a wider array of problems in the near future.
 
-\section{Background}
-Keep related work here and separate from introduction. some glue text here before we go into separate subsections on the energy aspects and the algorithmic aspects of sorting.
+Relevance. 
+ 
+Motivate and connect to a larger set of problems. Highlight contributions and list limitations.
 
-\subsection{energy considerations on GPUs}
+\input{background.tex}
 
-\subsection{sorting algorithms}
-review popular distributed sorting algorithms. Talk briefly about communication avoiding algorithms and with our prior work on HykSort.
+\input{distsort.tex}
 
-\section{Distributed Sorting}
+\input{nodesort.tex}
 
-Here describe the actual sorting algorithms used.
+\input{experiments.tex}
 
-\section{Experimental Setup}
-
-Talk about architectures used, how we measure energy etc.
-
-\section{Results}
-
+\input{results.tex}
 
 \section{Discussion}
 Discuss results and what the key findings are and what it means for future architectures.
@@ -62,7 +66,7 @@ Thank Christopher Strong, nvidia?, Funding agencies.
 
 %
 \bibliographystyle{abbrv}
-\bibliography{esort} 
+\bibliography{esort,nitro,tuning} 
 
 %\balancecolumns % GM June 2007
 % That's all folks!
