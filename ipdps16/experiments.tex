@@ -1,0 +1,99 @@
+\section{Experimental Methodology}
+
+This section describes the input data for sort and the
+three target architectures used in our experiment.
+
+\paragraph{Input Data}
+As the performance of sort is dependent on its input data, we 
+use a variety of data types, distributions and sizes in our experiments.
+We consider XXX data types: 
+integer, long integer, float, double, {\color{red} fill in
+the rest.}
+The distribution of key values 
+includes a uniform distribution, a Gaussian distribution, 
+{\color{red} fill in
+the rest.}
+Sizes are motivated by each experiment and the capacity of the
+target architecture.  {\color{red} For Titan, ...  
+For K20c ... For Jetson ...  Perhaps this goes in the results section.}
+
+\paragraph{Titan (ORNL)} 
+We are interested in 
+achieving scalable energy efficiency for distributed
+sorting on supercomputers, and therefore the target architecture is the
+Titan system at Oak Ridge.  Titan has 
+{\color{red}... CPUs ... GPUs ...  compiler/OpenMP/MPI installations?}
+We would like to measure performance on the GPUs on Titan, but encountered
+an obstacle in the software installation.  
+The CUDA version used on Titan is CUDA XXX, which is out-of-date with respect to
+sorting implementations we are using.  We are also unable to measure
+power and energy in the same way on Titan as on the other platforms.
+Therefore, we will focus our
+Titan experiments on using the OpenMP implementation of sorting, and focus
+data gathering on the communication and scaling aspects of our optimizations.
+We will then extrapolate
+Titan GPU results using other representative clusters.
+
+%\noindent
+%{\bf K20 cluster.}
+%{\color{red} This is the SCI cluster.  Omit if we don't have results on it.}
+
+\paragraph{Nvidia K20c standalone GPU}
+For the node-level experiments, we used an Nvidia K20c (Kepler 
+generation) standalone GPU, representative of the Titan nodes.  
+This machine has 13 GPU streaming multiprocessors, 
+for a total of 2496 cores, 
+4.8 GBytes of memory and an L2 cache of 1.25 GBytes.
+It uses CUDA 6.5 and nvcc compiler version XXX.
+We use this machine in our experiments because we have complete control 
+over its installation, software tools and configuration for each run.
+
+For energy and power measurements, we use {\color{red} 
+... identify software power
+measurement tool and other details of methodology}.  The K20c has five clock frequency settings ranging from 614MHz to 758MHz, with 705MHz as the default setting.
+The clock frequency can be adjusted 
+{\color{red} ... say how}.  It has two memory frequencies as well, 
+but we do not adjust memory frequency in these experiments 
+because the lower memory frequency of {\color{red} say what it is}
+is far lower than peak of {\color{red} say what it is}
+and is therefore going to perform poorly in a bandwidth-limited
+algorithm such as sort.
+
+\paragraph{Jetson TK1 cluster}
+We also measured performance of the distributed sorting on an Nvidia 
+Jetson TK1 cluster; the nodes of the Jetson are low-power and lightweight,
+consisting of a single GPU streaming multiprocessor (Kepler generation)
+with 192 cores, and 
+four-plus-one ARM cores, where the fifth ARM core is used as a master processor.
+The nodes have a unified DRAM of 2 GBytes, which is shared between CPUs and
+GPUs, and separate cache structures for CPU and GPU.
+The cluster we use in this experiment has {\color{red} XXX} nodes, and
+the nodes are connected with {\color{red} ... network details.}
+The software installation uses CUDA 6.5, nvcc compiler version 6.5.35,
+MPI version 1.6.5, and OpenMP version 3.1.
+
+The power and energy reported for
+Jetson are physical measurements  
+using the BK Precision's 2138e 4-1/2 ½ digital multimeter.
+We measure the voltage drop across a known precision resistance in series with the Device Under Test (DUT). With a known resistance and measured voltage on that resistance, the current can be obtained with I=V/R. Here, the resistance is 0.020 ohms with a 1\% variation.
+To determine the power, P=IV where I is the value calculated above, and V is 12V.
+The Jetson has fourteen core clock frequencies ranging from 72MHz to 852MHz,
+and twelve memory frequencies from 12.75MHz to 924MHz;
+because collecting physical measurements 
+on all 1728 combinations of core/memory frequency per data set would 
+be prohibitively time-consuming, 
+we sampled for this experiment. {\color{red} Perhaps
+say what data we have or save for the results.}
+
+While not capable of the high GPU performance of the K20c
+since it has only one-thirteenth of the SMs, the
+Jetson GPU still outperforms the OpenMP node-level sort by XXX
+{\color{red} for a ... explain experiment...}.  
+Therefore, while not necessarily representative of Titan, 
+the Jetson cluster looks to the future of high-performance and 
+embedded GPU platforms.  The unified memory allows us to look 
+at power and energy without the data movement required to copy
+from CPU to GPU, and the large number of frequency adjustments
+allow us to examine how the large number of degrees of freedom
+in energy management impacts energy, power and performance in 
+code variant selection. 
