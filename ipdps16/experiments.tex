@@ -38,26 +38,24 @@ Titan GPU results using other representative clusters.
 %{\bf K20 cluster.}
 %{\color{red} This is the SCI cluster.  Omit if we don't have results on it.}
 
-\paragraph{Nvidia K20c standalone GPU}
-For the node-level experiments, we used an Nvidia K20c (Kepler 
-generation) standalone GPU, representative of the Titan nodes.  
-This machine has 13 GPU streaming multiprocessors, 
-for a total of 2496 cores, 
-4.8 GBytes of memory and an L2 cache of 1.25 GBytes.
-It uses CUDA 6.5 and nvcc compiler version XXX.
-We use this machine in our experiments because we have complete control 
-over its installation, software tools and configuration for each run.
+\paragraph{NVIDIA K80 Standalone GPU}
+For the node-level experiments, we used an NVIDIA K80 (Kepler 
+generation) standalone GPU.
+It has 26 GPU streaming multiprocessors, for a total of 4992 cores, 
+and 24 GBytes of memory.
 
-For energy and power measurements, we use {\color{red} 
-... identify software power
-measurement tool and other details of methodology}.  The K20c has five clock frequency settings ranging from 614MHz to 758MHz, with 705MHz as the default setting.
-The clock frequency can be adjusted 
-{\color{red} ... say how}.  It has two memory frequencies as well, 
+The K80 supports 25 core clock frequency settings ranging from 562 Mhz to 875 Mhz
+in 13 Mhz increments.
+It supports two memory frequencies as well, 
 but we do not adjust memory frequency in these experiments 
-because the lower memory frequency of {\color{red} say what it is}
-is far lower than peak of {\color{red} say what it is}
+because the lower memory frequency of 324 Mhz
+is far lower than peak of 2505 Mhz
 and is therefore going to perform poorly in a bandwidth-limited
 algorithm such as sort.
+For frequency adjustments and energy and power measurements, we use the NVML
+API~\cite{} from NVIDIA. The K80 also uses a mechanism called \textit{AutoBoost} to dynamically
+vary clock frequencies to fill available power headroom. We disable this feature
+for more consistent data collection.
 
 \paragraph{Jetson TK1 Cluster}
 We also measured performance of distributed sorting on an NVIDIA 
