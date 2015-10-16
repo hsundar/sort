@@ -53,7 +53,8 @@ is far lower than peak of 2505 Mhz
 and is therefore going to perform poorly in a bandwidth-limited
 algorithm such as sort.
 For frequency adjustments and energy and power measurements, we use the NVML
-API~\cite{} from NVIDIA. The K80 also uses a mechanism called \textit{AutoBoost} to dynamically
+API~\cite{} from NVIDIA. Power readings were sampled at 10 Hz.
+The K80 also uses a mechanism called \textit{AutoBoost} to dynamically
 vary clock frequencies to fill available power headroom. We disable this feature
 for more consistent data collection.
 
