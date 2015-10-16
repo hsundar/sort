@@ -59,39 +59,37 @@ is far lower than peak of {\color{red} say what it is}
 and is therefore going to perform poorly in a bandwidth-limited
 algorithm such as sort.
 
-\paragraph{Jetson TK1 cluster}
-We also measured performance of the distributed sorting on an Nvidia 
+\paragraph{Jetson TK1 Cluster}
+We also measured performance of distributed sorting on an NVIDIA 
 Jetson TK1 cluster; the nodes of the Jetson are low-power and lightweight,
 consisting of a single GPU streaming multiprocessor (Kepler generation)
 with 192 cores, and 
 four-plus-one ARM cores, where the fifth ARM core is used as a master processor.
 The nodes have a unified DRAM of 2 GBytes, which is shared between CPUs and
 GPUs, and separate cache structures for CPU and GPU.
-The cluster we use in this experiment has {\color{red} XXX} nodes, and
+The cluster we use in this experiment has 16 nodes, and
 the nodes are connected with {\color{red} ... network details.}
 The software installation uses CUDA 6.5, nvcc compiler version 6.5.35,
 MPI version 1.6.5, and OpenMP version 3.1.
 
 The power and energy reported for
 Jetson are physical measurements  
-using the BK Precision's 2138e 4-1/2 ½ digital multimeter.
-We measure the voltage drop across a known precision resistance in series with the Device Under Test (DUT). With a known resistance and measured voltage on that resistance, the current can be obtained with I=V/R. Here, the resistance is 0.020 ohms with a 1\% variation.
-To determine the power, P=IV where I is the value calculated above, and V is 12V.
-The Jetson has fourteen core clock frequencies ranging from 72MHz to 852MHz,
+using the Yokogawa WT310 digital multimeter.
+We measure the voltage drop across a known precision resistance in series with the device under test (DUT).
+With a known resistance and measured voltage on that resistance,
+the current can be obtained with the equation $I=V/R$.
+Here, the resistance is 0.020 Ohms with a 1\% variation.
+To determine the power, we use the equation $P=IV$, where $I$ is the value calculated above, and $V$ is 12.19V.
+The Jetson has 14 core clock frequencies ranging from 72MHz to 852MHz,
 and twelve memory frequencies from 12.75MHz to 924MHz;
-because collecting physical measurements 
+since collecting physical measurements 
 on all 1728 combinations of core/memory frequency per data set would 
-be prohibitively time-consuming, 
-we sampled for this experiment. {\color{red} Perhaps
-say what data we have or save for the results.}
+be prohibitively time-consuming, we only varied core frequencies for our experiments.
 
-While not capable of the high GPU performance of the K20c
-since it has only one-thirteenth of the SMs, the
-Jetson GPU still outperforms the OpenMP node-level sort by XXX
-{\color{red} for a ... explain experiment...}.  
-Therefore, while not necessarily representative of Titan, 
+While not capable of the high GPU performance of the K80
+since it has only one-thirteenth of the SMs,
 the Jetson cluster looks to the future of high-performance and 
-embedded GPU platforms.  The unified memory allows us to look 
+embedded GPU platforms. Support for unified memory allows us to look 
 at power and energy without the data movement required to copy
 from CPU to GPU, and the large number of frequency adjustments
 allow us to examine how the large number of degrees of freedom
