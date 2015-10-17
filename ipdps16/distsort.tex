@@ -8,7 +8,9 @@ In \cite{hyksort}, we proposed a variant of HyperQuicksort\cite{wagar87} that al
   \label{eq:bw}
     k \frac{\log^2 p}{\log k} + \frac{N}{p}.
 \end{equation}   
-Ignoring the $N/p$ term, we can see that for Samplesort($k=p$) the bandwidth required is $\mathcal{O}(p\log^ p)$, whereas it is only $\mathcal{O}(\log^ p)$ for Hyperquicksort. So clearly, Hyperquicksort is preferable from the bandwidth (and therefor power) perspective. An added benefit is that Hyperquicksort only sends $\mathcal{O}(p)$ message at each stage as opposed to $\mathcal{O}(p^2)$ for Samplesort. While Hyperquicksort does communicate $\mathcal{O}(n\log n)$ data, as compared with $\mathcal{O}(n)$, it's overall performance and scalability is comparable to Samplesort\cite{hyksort}. It is not possible to reduce the bandwidth term for Samplesort, so we modify Hyperquicksort to reduce the amount data it needs to communicate. This is achieved by selectively changing the task-role instead of moving data between tasks. We call this algorithm {\sc SwapRankSort}. This is in principle similar to moving the computation to the data instead of moving the data to the computation. We now elaborate on {\sc SwapRankSort}.
+Ignoring the $N/p$ term, we can see that for Samplesort($k=p$) the bandwidth required is $\mathcal{O}(p\log^ p)$, whereas it is only $\mathcal{O}(\log^ p)$ for Hyperquicksort. So clearly, Hyperquicksort is preferable from the bandwidth (and therefor power) perspective. An added benefit is that Hyperquicksort only sends $\mathcal{O}(p)$ message at each stage as opposed to $\mathcal{O}(p^2)$ for Samplesort. While Hyperquicksort does communicate $\mathcal{O}(n\log n)$ data, as compared with $\mathcal{O}(n)$, it's overall performance and scalability is comparable to Samplesort\cite{hyksort}. 
+
+We propose modifications to HyperQuickSort and SampleSort (also applicable to HykSort and HistogramSort) that reduce the amount of data exchanged between processes. This is achieved by selectively changing the task-role prior to data-movement between tasks. We call these variants {\sc SwapRankSort} and {\sc SwapSampleSort}. This is in principle similar to moving the computation to the data instead of moving the data to the computation. We now elaborate on {\sc SwapRankSort} and {\sc SwapSampleSort}.
 
 \subsection{{\sc SwapRankSort}}
 
@@ -66,3 +68,22 @@ Given that we run this in a distributed setting implies that even a single pair 
   \end{center}
   \caption{\label{fig:swaprank} Illustration of the central idea behind {\sc SwapRankSort}. In (a) the distribution of the keys results in the tasks exchanging a small number of keys. Ranks are not swapped in this case and the program behavior is the same as Hyperquicksort. In (b), we illustrate the case where the smaller ranked task (in blue) has a large number of keys greater than the pivot, and the higher ranked task(red) has a large number of keys smaller than the pivot. This results in a lot of data exchange. In (c), we illustrate {\sc SwapRankSort} where the tasks swap ranks and exchange the smaller set of keys. }
 \end{figure} 
+
+\subsection{{\sc SwapSampleSort}} The idea behind {\sc SwapRankSort} cannot be extended directly to samplesort. Since samplesort does a single exchange of data, chhoosing the rank based on the largest partition (data bucket) on a given process will not lead to a significant reduction in data movement. Therefore the rank selection needs to account for the complete data distribution. We can achieve this by considering the data exchange as an \texttt{Alltoallv} on a hypercube and choosing a rank that minimizes the overall communication at each step. We achieve this by a scan of the bucket counts and a single pass, as shown in the following code. 
+\begin{minted}[mathescape,
+               linenos,
+               numbersep=5pt,
+               frame=lines,
+               framesep=2mm]{c++}
+count_scan = scan(bucket_counts);
+for (int q=npes>>1; q; q>>=1) {
+  if(count_scan[offset+q] > midP) 
+    midP >>= 1
+  else {
+    new_rank += q;
+    offset += q;
+    midP += midP>>1;
+  }	
+}    
+\end{minted}  
+There is only a single split of the communicator in this case and the computation of the new rank and the split does not add a significant overhead.  
