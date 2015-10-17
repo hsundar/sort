@@ -1,0 +1,79 @@
+\section{Background}
+Keep related work here and separate from introduction. some glue text here before we go into separate subsections on the energy aspects and the algorithmic aspects of sorting.
+
+\subsection{energy considerations on GPUs}
+
+\todo{Saurav}
+
+\subsection{Sorting Algorithms}
+\label{sec:bg-dist}
+
+The design and implementation of parallel algorithms for sorting is a well studied subject. In our discussion of prior work, we focus our attention to distributed memory algorithms that have been experimentally shown to scale to large core counts and large datasets. We will also discuss related sorting algorithms (albeit not at scale) that study the energy-efficiency of sorting. We begin by a formal definition of distributed sorting.
+
+Given an array $A$ with $N$ keys and an order (comparison) relation, we would like to sort the elements of $A$ in ascending order. In a distributed memory machine with $p$ tasks, every task is assigned an $N/p$-sized block of $A$. Upon completion, task $i$ will have the $i^{\text{th}}$ block of the sorted array. Note that the overall ordering of the keys is determined by the ordering of the tasks as well as the ordering of the keys on each task.  
+
+\paragraph{Distributed sorting}
+
+The most popular algorithm used in actual distributed
+sort implementations is SampleSort, originally proposed by Frazer and McKellar\cite{samplesort}. Given $p$ tasks, we
+reshuffle the elements of $A$ in $p$ buckets so that all the
+keys in the $i^\text{th}$ bucket are smaller (or equal) than the keys in
+the $(i+1)^\text{th}$ bucket. Bucket $i$ is assigned to task $i$ and thus,
+once we have shuffled $A$, each task can sort its bucket of
+keys in an embarrassingly parallel manner using any local
+(shared-memory-parallel) sort algorithm. The challenge is to obtain good load-balancing, i.e., ensuring that each task  has roughly the same number of keys, while minimizing communication costs.  It is important to note that the shuffling of data is the main communication cost and bottleneck and that reducing the amount of data shuffled is the key to reducing the energy and power requirements of any distributed sorting algorithm.    
+
+One possible way to reshuffle $A$ is to estimate the boundaries for each bucket, by selecting $p-1$ keys, which we call
+``splitters''. This can be done  by sampling a
+subset of keys in $A$, sorting them and selecting splitters from that set. Once these $p-1$ splitters have been
+selected, a global data exchange takes place to move the original keys of every task to their correct bucket.
+An additional local sort is invoked to finalize the output array. SampleSort is well understood. However, its performance is quite sensitive to the selection of splitters, which can result in load imbalance. Most importantly, the final data exchange---requiring $\mathcal{O}(p^2)$ messages---can congest the network. As a result SampleSort may scale suboptimally, especially when the communication volume approaches the available hardware limits \cite{hyksort}.
+
+Parallel HistogramSort~\cite{kale93,solomonik10} is
+a variant of SampleSort that efficiently estimates the splitters. The authors presented
+one of the largest distributed comparison sort runs (32K cores on
+BG/P) with $46\%$ efficiency. The algorithm overlaps communication
+and computation in all stages. During the splitter estimation
+stage, the iterative estimation of the ranks of the splitters is
+combined with partial local sorting of the data, by using the
+splitter candidates as pivots for quicksort. Once the splitters
+are estimated, the communication of data is staged and overlapped
+with local merging. In~\cite{solomonik10} the best throughput was
+obtained on 16,384 cores of Jaguar XT4 at ORNL for 8M (64-bit) keys
+per core; the sort took 4.3 seconds achieving a in-RAM throughput of
+14.4TB/min. 
+
+% CloudRAMSort \cite{kim12} demonstrated good scalability on 256 nodes with shared memory parallelism using {\texttt pThreads} and SIMD vectorization. Thebest results are for sorting 1TB of data (10byte key + 90byte record) in 4.6 secs achieving an in-RAM throughput of 12.6 TB/min. Theyuse a variant of Histogram Sort~\cite{kale93}, where the samples are iteratively computed (in parallel) in order to guarantee a minimum quality of load-balance. Additionally, the communication of the records is split into two parts by first communicating the keys followed by the values overlapped with the merging of the keys. 
+
+In recent work \cite{hyksort}, we have addressed the scalability of sorting on very large clusters. Hyksort\cite{hyksort} is an extension of quicksort on a Hypercube \cite{wagar87} to a $k$-ary Hypercube along with an efficient parallel (median) selection algorithm. In this work we propose changes to the standard distributed sorting algorithm---samplesort, histogramsort and Hyksort---allowing us to minimize the data communicated across processors. The gains are significant for skewed distributions in particular. We describe the new communication-avoiding distributed sort algorithm in detail in \S\ref{sec:dsort}.
+
+\paragraph{High-performance GPU sorting}
+Several sorting algorithms tailored for GPU architectures have been proposed
+in the literature. The earliest sorting implementations were often
+based on Batcher's bitonic sort~\cite{batcher:1968}. This includes work from Purcell et al.~\cite{purcell:2003},
+and Kipfer et al.~\cite{kipfer:2005}. The advent of the CUDA programming model
+enabled the construction of more complex sorting algorithms. Harris et al.~\cite{harris:2007} implemented
+a split-based radix sort and a parallel merge sort. Le Grand~\cite{legrand:2007} and He~\cite{he:2007} described a
+histogram-based radix sort. Segmented scan-based implementations of radix and merge sorts were
+presented by Sengupta et al.~\cite{sengupta:2007}.
+Improved versions of radix and merge sorts were presented by Satish et al.~\cite{satish:2009}
+and by Merrill et al.~\cite{merrill:2011}.
+In this paper, we use two state-of-the-art GPU sorting algorithms at the
+node level: radix sort from the CUB library~\cite{cub}, and merge sort from the ModernGPU library~\cite{modernGPU}.
+%mention the general approaches. 
+
+\paragraph{Code variant tuning}
+Apart from Nitro~\cite{muralidharan:2014},
+several programmer-directed autotuning frameworks support
+tuning of code/algorithmic variants.
+Petabricks~\cite{PetaBricks} 
+supports user specification of \textit{transforms} that
+are analogous to functions. Transforms are automatically
+composed together to form hybrid algorithms using a compiler
+framework and an adaptive algorithm~\cite{increa11}. Petabricks, however,
+implicitly tunes variants for the size of the input data set. Ding et
+al.~\cite{ding:2015} propose extensions to the PetaBricks language to
+enable support for tuning based on arbitrary input features.
+
+\paragraph{Multi-objective optimization}
+\todo{Saurav}

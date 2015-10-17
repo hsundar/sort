@@ -1,0 +1,102 @@
+\section{Experimental Methodology}
+
+This section describes the 
+target architectures used in our experiment
+and the input datasets for sort.
+
+\subsection{Target Architectures}
+
+We ran our experiments on two different platforms: an NVIDIA Tesla K80
+cluster, and an NVIDIA Jetson TK1 cluster. While the K80 is among
+the highest performing GPUs available today, the Jetson is representative
+of lightweight, low-power embedded GPUs.
+
+%\paragraph{Titan (ORNL)} 
+%We are interested in 
+%achieving scalable energy efficiency for distributed
+%sorting on supercomputers, and therefore the target architecture is the
+%Titan system at Oak Ridge.  Titan has 
+%{\color{red}... CPUs ... GPUs ...  compiler/OpenMP/MPI installations?}
+%We would like to measure performance on the GPUs on Titan, but encountered
+%an obstacle in the software installation.  
+%The CUDA version used on Titan is CUDA XXX, which is out-of-date with respect to
+%sorting implementations we are using.  We are also unable to measure
+%%power and energy in the same way on Titan as on the other platforms.
+%Therefore, we will focus our
+%Titan experiments on using the OpenMP implementation of sorting, and focus
+%data gathering on the communication and scaling aspects of our optimizations.
+%We will then extrapolate
+%Titan GPU results using other representative clusters.
+
+%\noindent
+%{\bf K20 cluster.}
+%{\color{red} This is the SCI cluster.  Omit if we don't have results on it.}
+
+\paragraph{NVIDIA Tesla K80 Cluster}
+%For the node-level experiments, we used an NVIDIA K80 (Kepler 
+%generation) standalone GPU.
+The first machine we consider is a cluster of 16 NVIDIA Tesla K80 GPUs.
+The NVIDIA Tesla K80 GPU
+has 26 GPU streaming multiprocessors, for a total of 4992 cores, 
+and 24 GBytes of memory.
+It supports 25 core clock frequency settings ranging from 562 Mhz to 875 Mhz
+in 13 Mhz increments.
+Two memory frequencies are supported as well, 
+but we do not adjust memory frequency in these experiments 
+because the lower memory frequency of 324 Mhz
+is far lower than peak of 2505 Mhz
+and is therefore going to perform poorly in a bandwidth-limited
+algorithm such as sort.
+For frequency adjustments and energy and power measurements, we use the NVML
+API~\cite{} from NVIDIA. Power readings were sampled at 10 Hz.
+The K80 also uses a mechanism called \textit{AutoBoost} to dynamically
+vary clock frequencies to fill available power headroom. We disable this feature
+for more consistent data collection.
+
+\paragraph{Jetson TK1 Cluster}
+We also measured performance of distributed sorting on an NVIDIA 
+Jetson TK1 cluster; the nodes of the Jetson are low-power and lightweight,
+consisting of a single GPU streaming multiprocessor (Kepler generation)
+with 192 cores, and 
+four-plus-one ARM cores, where the fifth ARM core is used as a master processor.
+The nodes have a unified DRAM of 2 GBytes, which is shared between CPUs and
+GPUs, and separate cache structures for CPU and GPU.
+The cluster we use in this experiment has 16 nodes, and
+the nodes are connected with {\color{red} ... network details.}
+The software installation uses CUDA 6.5, nvcc compiler version 6.5.35,
+MPI version 1.6.5, and OpenMP version 3.1.
+
+The power and energy reported for
+Jetson are physical measurements  
+using the Yokogawa WT310 digital multimeter.
+We measure the voltage drop across a known precision resistance in series with the device under test (DUT).
+With a known resistance and measured voltage on that resistance,
+the current can be obtained with the equation $I=V/R$.
+Here, the resistance is 0.020 Ohms with a 1\% variation.
+To determine the power, we use the equation $P=IV$, where $I$ is the value calculated above, and $V$ is 12.19V.
+The Jetson has 14 core clock frequencies ranging from 72MHz to 852MHz,
+and twelve memory frequencies from 12.75MHz to 924MHz;
+since collecting physical measurements 
+on all 1728 combinations of core/memory frequency per data set would 
+be prohibitively time-consuming, we only varied core frequencies for our experiments.
+
+While not capable of the high GPU performance of the K80
+since it has only one-thirteenth of the SMs,
+the Jetson cluster looks to the future of high-performance and 
+embedded GPU platforms. Support for unified memory allows us to look 
+at power and energy without the data movement required to copy
+from CPU to GPU, and the large number of frequency adjustments
+allow us to examine how the large number of degrees of freedom
+in energy management impacts energy, power and performance in 
+code variant selection. 
+
+\subsection{Input Data}
+As the performance of sort is dependent on its input data, we 
+use a variety of data types and sizes in our experiments.
+We consider two data types: 
+integer and long integer
+Sizes are motivated by each experiment and the capacity of the
+target architecture.
+{\color{red} For Titan, ...  
+For K20c ... For Jetson ...  Perhaps this goes in the results section.}
+
