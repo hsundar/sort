@@ -6,10 +6,10 @@ TARGET = paper.pdf
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	pdflatex $<
+	pdflatex -shell-escape $<
 	bibtex $<
-	pdflatex $<
-	pdflatex $<
+	pdflatex -shell-escape $<
+	pdflatex -shell-escape $<
 
 clean:
 	rm -f *.aux *.bbl *.blg *.log *.out *.pdf $(TARGET)
