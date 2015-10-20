@@ -1,0 +1,66 @@
+\relax 
+\citation{samplesort}
+\citation{hyksort}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{\thepage }}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background}{\thepage }}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}energy considerations on GPUs}{\thepage }}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}Sorting Algorithms}{\thepage }}
+\newlabel{sec:bg-dist}{{2.2}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Distributed sorting}{\thepage }}
+\citation{kale93}
+\citation{solomonik10}
+\citation{solomonik10}
+\citation{kim12}
+\citation{kale93}
+\citation{hyksort}
+\citation{hyksort}
+\citation{wagar87}
+\citation{hyksort}
+\citation{batcher:1968}
+\citation{purcell:2003}
+\citation{kipfer:2005}
+\citation{harris:2007}
+\citation{legrand:2007}
+\citation{he:2007}
+\citation{sengupta:2007}
+\citation{satish:2009}
+\citation{merrill:2011}
+\citation{cub}
+\citation{modernGPU}
+\citation{muralidharan:2014}
+\citation{PetaBricks}
+\citation{increa11}
+\citation{ding:2015}
+\citation{hyksort}
+\citation{wagar87}
+\citation{hyksort}
+\@writefile{toc}{\contentsline {paragraph}{High-performance GPU sorting}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Code variant tuning}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Multi-objective optimization}{\thepage }}
+\@writefile{toc}{\contentsline {section}{\numberline {3}Distributed Sorting}{\thepage }}
+\newlabel{sec:dsort}{{3}{\thepage }}
+\newlabel{eq:bw}{{1}{\thepage }}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}{\sc  SwapRankSort}}{\thepage }}
+\citation{modernGPU}
+\citation{cub}
+\citation{muralidharan:2014}
+\citation{muralidharan:2014}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces  Illustration of the central idea behind {\sc  SwapRankSort}. In (a) the distribution of the keys results in the tasks exchanging a small number of keys. Ranks are not swapped in this case and the program behavior is the same as Hyperquicksort. In (b), we illustrate the case where the smaller ranked task (in blue) has a large number of keys greater than the pivot, and the higher ranked task(red) has a large number of keys smaller than the pivot. This results in a lot of data exchange. In (c), we illustrate {\sc  SwapRankSort} where the tasks swap ranks and exchange the smaller set of keys. }}{\thepage }}
+\newlabel{fig:swaprank}{{1}{\thepage }}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Energy-Efficient Node Sorting}{\thepage }}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}Overview of Approach}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{GPU vs. Parallel CPU Sorting}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Sorting algorithms as code variants}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Managing energy and power on the GPU}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Code variant selection using Nitro}{\thepage }}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}Code Variant Selection Criteria}{\thepage }}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Experimental Methodology}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Input Data}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Titan (ORNL)}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Nvidia K20c standalone GPU}{\thepage }}
+\@writefile{toc}{\contentsline {paragraph}{Jetson TK1 cluster}{\thepage }}
+\bibstyle{abbrv}
+\bibdata{esort,nitro,tuning}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Experimental Results}{\thepage }}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Discussion}{\thepage }}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Acknowledgments}{\thepage }}
